@@ -34,7 +34,7 @@ matrix:
       rust: nightly-2019-05-20
       sudo: required
       cache: cargo
-      env: RUSTFLAGS="--cfg procmacro2_semver_exempt"
+      env: RUSTFLAGS="--cfg procmacro2_semver_exempt" RUST_BACKTRACE=1
       addons:
         apt:
           packages:
