@@ -50,10 +50,6 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 
-## Coverage
-
-[![Sunburst Coverage](https://codecov.io/gh/CAD97/generativity/graphs/sunburst.svg)][Codecov]
-
   [Discord]: <https://discord.gg/FuPE9JE>
   [Travis]: <https://travis-ci.com/CAD97/generativity>
   [Codecov]: <https://codecov.io/gh/CAD97/generativity>
