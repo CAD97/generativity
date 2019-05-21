@@ -1,0 +1,11 @@
+[package]
+name = "generativity"
+version = "0.1.0"
+edition = "2018"
+
+authors = ["cad97 <cad97@cad97.com>"]
+keywords = ["generativity","no_std"]
+categories = ["no-std","rust-patterns"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
