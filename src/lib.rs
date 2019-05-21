@@ -1,8 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 
-use core::{
-    fmt, marker::PhantomData,
-};
+use core::{fmt, marker::PhantomData};
 
 /// A phantomdata-like type taking a single invariant lifetime.
 ///
@@ -16,7 +14,7 @@ impl<'id> Id<'id> {
     /// Do not use this function; use the `guard!` macro instead.
     pub unsafe fn new() -> Self {
         Id {
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -29,7 +27,9 @@ impl<'id> fmt::Debug for Id<'id> {
 
 impl<'id> From<Guard<'id>> for Id<'id> {
     fn from(_guard: Guard<'id>) -> Self {
-        Id { phantom: PhantomData }
+        Id {
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -71,14 +71,16 @@ macro_rules! make_guard {
         let tag = unsafe { $crate::Id::new() };
         let _guard;
         let $name = unsafe { $crate::Guard::new(tag) };
-        { if false {
-            #[allow(non_camel_case_types)]
-            struct make_guard<'id>(&'id $crate::Id<'id>);
-            impl<'id> ::core::ops::Drop for make_guard<'id> {
-                fn drop(&mut self) {}
+        {
+            if false {
+                #[allow(non_camel_case_types)]
+                struct make_guard<'id>(&'id $crate::Id<'id>);
+                impl<'id> ::core::ops::Drop for make_guard<'id> {
+                    fn drop(&mut self) {}
+                }
+                _guard = make_guard(&tag);
             }
-            _guard = make_guard(&tag);
-        } }
+        }
     };
 }
 
