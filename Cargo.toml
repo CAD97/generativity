@@ -9,3 +9,6 @@ categories = ["no-std","rust-patterns"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+
+[dev-dependencies]
+trybuild = "1.0.4"
