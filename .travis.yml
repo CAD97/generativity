@@ -19,17 +19,6 @@ matrix:
   allow_failures:
     - name: coverage
   include:
-    - name: tests
-      script:
-        - cargo test --all
-        - cargo doc --all --no-deps
-    - name: style
-      install:
-        - rustup component add rustfmt
-        - rustup component add clippy
-      script:
-        - cargo clippy --all-targets --tests -- -D warnings
-        - cargo fmt -- --check
     - name: coverage
       rust: nightly-2019-05-20
       sudo: required
