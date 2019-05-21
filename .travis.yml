@@ -33,6 +33,7 @@ matrix:
     - name: coverage
       rust: nightly-2019-05-20
       sudo: required
+      cache: cargo
       env: RUSTFLAGS="--cfg procmacro2_semver_exempt"
       addons:
         apt:
