@@ -72,16 +72,18 @@ macro_rules! make_guard {
         let _guard;
         let $name = unsafe { $crate::Guard::new(tag) };
         { if false {
-            struct D<'id>(&'id $crate::Id<'id>);
-            impl<'id> ::core::ops::Drop for D<'id> {
+            #[allow(non_camel_case_types)]
+            struct make_guard<'id>(&'id $crate::Id<'id>);
+            impl<'id> ::core::ops::Drop for make_guard<'id> {
                 fn drop(&mut self) {}
             }
-            _guard = D(&tag);
+            _guard = make_guard(&tag);
         } }
     };
 }
 
 #[test]
+#[allow(clippy::eq_op)]
 fn dont_error_in_general() {
     make_guard!(a);
     make_guard!(b);
