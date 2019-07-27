@@ -1,5 +1,5 @@
 language: rust
-rust: nightly
+rust: beta
 
 # https://levans.fr/rust_travis_cache.html
 cache:
