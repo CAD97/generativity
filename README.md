@@ -36,18 +36,16 @@ wrapped scope if they so desire the trade-off of macro versus closure indentatio
 
 ```rust
 let tag = unsafe { $crate::Id::new() };
-let _guard;
 let $name = unsafe { $crate::Guard::new(tag) };
-{
-    if false {
-        #[allow(non_camel_case_types)]
-        struct make_guard<'id>(&'id $crate::Id<'id>);
-        impl<'id> ::core::ops::Drop for make_guard<'id> {
-            fn drop(&mut self) {}
-        }
-        _guard = make_guard(&tag);
+let _guard = {
+    #[allow(non_camel_case_types)]
+    struct make_guard<'id>(&'id $crate::Id<'id>);
+    impl<'id> ::core::ops::Drop for make_guard<'id> {
+        #[inline(always)]
+        fn drop(&mut self) {}
     }
-}
+    make_guard(&tag)
+};
 ```
 
 See also #1 for further discussion.
@@ -56,14 +54,14 @@ See also #1 for further discussion.
 
 - New unique type per macro invocation: this is merely to avoid having a type in the public API,
   and such that the compiler emits slightly more useful error messages for lifetime errors.
-- `if false`: This is a micro-optimization not required for safety. This makes it easier for the
-  optimizer to optimize out the `_guard`'s drop implementation.
+- `#[inline(always)]`: This is a micro-optimization not required for safety. This makes it easier
+  for the optimizer to optimize out the `_guard`'s drop implementation.
 
 ### Three places, all required
 
 - `$name` is the user-named `#[unique] 'id` type that we give to the calling context.
-- `tag` is a location that we restrict the start of the `'id` lifetime to.
-- `_guard` is an `impl Drop` that we restrict the end of the `'id` lifetime to.
+- `tag` is a location that we use to define the `'id` lifetime without restricting `$name`.
+- `_guard` is an `impl Drop` that we use to restrict `'id`.
 
 ### `'id` is unique
 
@@ -102,7 +100,7 @@ fn main() {
     make_guard!(guard);
     unify(&place, &guard);
     scope(|guard| {
-        unify(&(), &guard);
+        unify(&place, &guard);
     })
 }
 ```
@@ -116,7 +114,7 @@ trusted carrier; one that can't be created from an untrusted lifetime carrier.
 Licensed under either of
 
 - Apache License, Version 2.0, (<LICENSE-APACHE> or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license (<LICENSE-MIT> or <http://opensource.org/licenses/MIT)
+- MIT license (<LICENSE-MIT> or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
