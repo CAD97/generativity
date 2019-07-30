@@ -11,7 +11,7 @@ pub struct Id<'id> {
 }
 
 impl<'id> Id<'id> {
-    /// Do not use this function; use the `guard!` macro instead.
+    /// Do not use this function; use the `make_guard!` macro instead.
     pub unsafe fn new() -> Self {
         Id {
             phantom: PhantomData,
@@ -69,18 +69,18 @@ impl<'id> fmt::Debug for Guard<'id> {
 macro_rules! make_guard {
     ($name:ident) => {
         let tag = unsafe { $crate::Id::new() };
-        let _guard;
         let $name = unsafe { $crate::Guard::new(tag) };
-        {
-            if false {
-                #[allow(non_camel_case_types)]
-                struct make_guard<'id>(&'id $crate::Id<'id>);
-                impl<'id> ::core::ops::Drop for make_guard<'id> {
-                    fn drop(&mut self) {}
-                }
-                _guard = make_guard(&tag);
+        let _guard = {
+            // FUTURE(optimization): make `make_guard` a ZST with `PhantomData`
+            // Restrict `'id` with `fn new(&'id Id<'id>) -> make_guard<'id>`?
+            #[allow(non_camel_case_types)]
+            struct make_guard<'id>(&'id $crate::Id<'id>);
+            impl<'id> ::core::ops::Drop for make_guard<'id> {
+                #[inline(always)]
+                fn drop(&mut self) {}
             }
-        }
+            make_guard(&tag)
+        };
     };
 }
 
