@@ -1,17 +1,33 @@
 #![cfg_attr(not(test), no_std)]
+//! Create a trusted carrier with a new lifetime that is guaranteed to be
+//! unique. When you call [`make_guard!`] to make a unique lifetime, the macro
+//! creates a [`Guard`] to hold it. This guard can be converted `into` an
+//! [`Id`], which can be stored in structures to uniquely "brand" them. A different
+//! invocation of the macro will produce a new lifetime that cannot be unified.
+//! These types have no safe way to construct them other than via
+//! [`make_guard!`].
+//!
+//! ```rust
+//! use generativity::{Id, make_guard};
+//! struct Struct<'id>(Id<'id>);
+//! make_guard!(a);
+//! Struct(a.into());
+//! ```
 
 use core::{fmt, marker::PhantomData};
 
 /// A phantomdata-like type taking a single invariant lifetime.
 ///
-/// Used to manipulate and store the unique invariant lifetime produce by `Guard`.
+/// Used to manipulate and store the unique invariant lifetime obtained from
+/// [`Guard`]. Use `guard.into()` to create a new `Id`.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Id<'id> {
-    phantom: PhantomData<&'id mut &'id fn(&'id ()) -> &'id ()>,
+    phantom: PhantomData<fn(&'id ()) -> &'id ()>,
 }
 
 impl<'id> Id<'id> {
-    /// Do not use this function; use the `make_guard!` macro instead.
+    // Do not use this function; use the `make_guard!` macro instead.
+    #[doc(hidden)]
     pub unsafe fn new() -> Self {
         Id {
             phantom: PhantomData,
@@ -35,7 +51,8 @@ impl<'id> From<Guard<'id>> for Id<'id> {
 
 /// An invariant lifetime phantomdata that is guaranteed to be unique.
 ///
-/// In effect, this means that `'id` is a "generative brand"
+/// In effect, this means that `'id` is a "generative brand". Use [`make_guard`]
+/// to obtain a new `Guard`.
 #[derive(Eq, PartialEq)]
 pub struct Guard<'id> {
     #[allow(unused)]
@@ -43,7 +60,8 @@ pub struct Guard<'id> {
 }
 
 impl<'id> Guard<'id> {
-    /// Do not use this function; use the `guard!` macro instead.
+    // Do not use this function; use the `guard!` macro instead.
+    #[doc(hidden)]
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
         Guard { id }
     }
@@ -84,11 +102,27 @@ macro_rules! make_guard {
     };
 }
 
-#[test]
-#[allow(clippy::eq_op)]
-fn dont_error_in_general() {
-    make_guard!(a);
-    make_guard!(b);
-    dbg!(a == a);
-    dbg!(b == b); // OK
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::eq_op)]
+    fn dont_error_in_general() {
+        make_guard!(a);
+        make_guard!(b);
+        dbg!(a == a);
+        dbg!(b == b); // OK
+    }
+
+    #[test]
+    fn is_unwind_safe() {
+        make_guard!(a);
+        struct Wrapper<'id>(Id<'id>);
+        let x = Wrapper(a.into());
+        std::panic::catch_unwind(|| {
+            let _x = x;
+        })
+        .unwrap();
+    }
 }
