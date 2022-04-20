@@ -1,0 +1,64 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: short
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --all-targets --no-fail-fast
+
+  # Versions before Unpin; can't check tests which statically check Unpin OIBIT
+  msrv-low:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Check all versions
+        uses: actions-rs/cargo@v1
+        with:
+          command: hack
+          args: --version-range 1.0..1.35 check
+
+  # Versions afterr Unpin; check tests which statically check Unpin OIBIT
+  msrv-high:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Check all versions
+        uses: actions-rs/cargo@v1
+        with:
+          command: hack
+          args: --version-range 1.36.. check --all-targets
