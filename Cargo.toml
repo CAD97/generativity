@@ -1,7 +1,6 @@
 [package]
 name = "generativity"
-version = "1.0.0"
-edition = "2018"
+version = "1.0.1"
 
 description = "Generation of unique invariant lifetimes"
 repository = "https://github.com/CAD97/generativity"
