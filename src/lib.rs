@@ -1,11 +1,12 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
+
 //! Create a trusted carrier with a new lifetime that is guaranteed to be
-//! unique. When you call [`make_guard!`] to make a unique lifetime, the macro
-//! creates a [`Guard`] to hold it. This guard can be converted `into` an
-//! [`Id`], which can be stored in structures to uniquely "brand" them. A different
-//! invocation of the macro will produce a new lifetime that cannot be unified.
-//! These types have no safe way to construct them other than via
-//! [`make_guard!`].
+//! unique among other trusted carriers. When you call [`make_guard!`] to make a
+//! unique lifetime, the macro creates a [`Guard`] to hold it. This guard can be
+//! converted `into` an [`Id`], which can be stored in structures to uniquely
+//! "brand" them. A different invocation of the macro will produce a new
+//! lifetime that cannot be unified. These types have no safe way to construct
+//! them other than via [`make_guard!`] or `unsafe` code.
 //!
 //! ```rust
 //! use generativity::{Id, make_guard};
@@ -13,8 +14,23 @@
 //! make_guard!(a);
 //! Struct(a.into());
 //! ```
+//!
+//! This is the concept of "generative" lifetime brands. `Guard` and `Id` are
+//! [invariant](https://doc.rust-lang.org/nomicon/subtyping.html#variance) over
+//! their lifetime parameter, meaning that it is never valid to substitute or
+//! otherwise coerce `Id<'a>` into `Id<'b>`, for *any* `'a` or `'b`, *including*
+//! the `'static` lifetime.
+//!
+//! Any invariant lifetime can be "trusted" to cary a brand, but when using this
+//! library, it is recommended to always use `Id<'id>` to carry the brand, as
+//! this reduces the risk of accidentally trusting an untrusted lifetime.
+//! Importantly, non-invariant lifetimes *cannot* be trusted, as the variance
+//! allows lifetimes to be contracted to match and copy the brand lifetime.
 
-use core::{fmt, marker::PhantomData};
+use core_::{fmt, marker::PhantomData};
+
+#[doc(hidden)]
+pub extern crate core as core_;
 
 /// A phantomdata-like type taking a single invariant lifetime.
 ///
@@ -26,8 +42,16 @@ pub struct Id<'id> {
 }
 
 impl<'id> Id<'id> {
-    // Do not use this function; use the `make_guard!` macro instead.
-    #[doc(hidden)]
+    /// Construct an `Id` with an unbound lifetime.
+    ///
+    /// You should not need to use this function; use [`make_guard!`] instead.
+    ///
+    /// # Safety
+    ///
+    /// This creates an unbound invariant lifetime that people are allowed to
+    /// assume means it was derived from their generative brand. This is the
+    /// "I know what I'm doing" button; restrict the lifetime to a known brand
+    /// immediately to avoid accidentally introducing unsoundness potential.
     pub unsafe fn new() -> Self {
         Id {
             phantom: PhantomData,
@@ -42,14 +66,13 @@ impl<'id> fmt::Debug for Id<'id> {
 }
 
 impl<'id> From<Guard<'id>> for Id<'id> {
-    fn from(_guard: Guard<'id>) -> Self {
-        Id {
-            phantom: PhantomData,
-        }
+    fn from(guard: Guard<'id>) -> Self {
+        guard.id
     }
 }
 
-/// An invariant lifetime phantomdata that is guaranteed to be unique.
+/// An invariant lifetime phantomdata that is guaranteed to be unique with
+/// respect to other invariant lifetimes.
 ///
 /// In effect, this means that `'id` is a "generative brand". Use [`make_guard`]
 /// to obtain a new `Guard`.
@@ -60,8 +83,16 @@ pub struct Guard<'id> {
 }
 
 impl<'id> Guard<'id> {
-    // Do not use this function; use the `guard!` macro instead.
-    #[doc(hidden)]
+    /// Construct a `Guard` with an unbound lifetime.
+    ///
+    /// You should not need to use this function; use [`make_guard!`] instead.
+    ///
+    /// # Safety
+    ///
+    /// This creates an unbound invariant lifetime that people are allowed to
+    /// assume means it was derived from their generative brand. This is the
+    /// "I know what I'm doing" button; restrict the lifetime to a known brand
+    /// immediately to avoid accidentally introducing unsoundness potential.
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
         Guard { id }
     }
@@ -73,11 +104,12 @@ impl<'id> fmt::Debug for Guard<'id> {
     }
 }
 
-/// Create a `Guard` with a unique lifetime.
+/// Create a `Guard` with a unique invariant lifetime (with respect to other
+/// trusted/invariant lifetime brands).
 ///
-/// Multiple invocations will not unify:
+/// Multiple `make_guard` lifetimes will always fail to unify:
 ///
-/// ```rust,compile_fail
+/// ```rust,compile_fail,E0597
 /// # use generativity::make_guard;
 /// make_guard!(a);
 /// make_guard!(b);
@@ -89,13 +121,16 @@ macro_rules! make_guard {
         let tag = unsafe { $crate::Id::new() };
         let $name = unsafe { $crate::Guard::new(tag) };
         let _guard = {
-            // FUTURE(optimization): make `make_guard` a ZST with `PhantomData`
-            // Restrict `'id` with `fn new(&'id Id<'id>) -> make_guard<'id>`?
             #[allow(non_camel_case_types)]
-            struct make_guard<'id>(&'id $crate::Id<'id>);
-            impl<'id> ::core::ops::Drop for make_guard<'id> {
+            struct make_guard<'id> {
+                _id: $crate::Id<'id>,
+            }
+            impl<'id> $crate::core_::ops::Drop for make_guard<'id> {
                 #[inline(always)]
                 fn drop(&mut self) {}
+            }
+            fn make_guard<'id>(id: &'id $crate::Id<'id>) -> make_guard<'id> {
+                make_guard { _id: *id }
             }
             make_guard(&tag)
         };
@@ -105,24 +140,27 @@ macro_rules! make_guard {
 #[cfg(test)]
 mod test {
     use super::*;
+    use core_::panic::{RefUnwindSafe, UnwindSafe};
 
     #[test]
-    #[allow(clippy::eq_op)]
     fn dont_error_in_general() {
         make_guard!(a);
         make_guard!(b);
-        dbg!(a == a);
-        dbg!(b == b); // OK
+        assert_eq!(a, a);
+        assert_eq!(b, b);
     }
 
     #[test]
-    fn is_unwind_safe() {
+    fn test_oibits() {
+        fn assert_oibits<T>(_: &T)
+        where
+            T: Send + Sync + Unpin + UnwindSafe + RefUnwindSafe,
+        {
+        }
+
         make_guard!(a);
-        struct Wrapper<'id>(Id<'id>);
-        let x = Wrapper(a.into());
-        std::panic::catch_unwind(|| {
-            let _x = x;
-        })
-        .unwrap();
+        assert_oibits(&a);
+        let id: Id<'_> = a.into();
+        assert_oibits(&id);
     }
 }

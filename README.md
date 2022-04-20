@@ -1,8 +1,4 @@
-# Generativity
-
-[![Chat on Discord](https://img.shields.io/badge/-chat-26262b.svg?style=popout&logo=discord)][Discord]
-[![Travis status](https://img.shields.io/travis/com/CAD97/generativity.svg?style=popout&logo=travis)][Travis]
-[![Coverage on CodeCov](https://img.shields.io/badge/-coverage-fo1f7a.svg?style=popout&logo=Codecov)][Codecov]
+# Generativity [![Chat on Discord](https://img.shields.io/discord/496481045684944897?style=flat&logo=discord)][Discord]
 
 Generativity refers to the creation of a unique lifetime: one that the Rust
 borrow checker will not unify with any other lifetime. This can be used to
@@ -32,30 +28,52 @@ hygiene hidden `impl Drop` can be used by any API that would normally use a clos
 argument, such as crossbeam's scoped threads, to make the containing scope the safe,
 wrapped scope if they so desire the trade-off of macro versus closure indentation.
 
+It's important to note that lifetimes are only trusted to cary lifetime brands when they
+are in fact invariant. Variant lifetimes, such as `&'a T`, can be shrunk to fit the expected
+lifetime; `&'static T` can be used where `&'a T` is expected, for any `'a`.
+
 ## Informal proof of correctness
 
 ```rust
-let tag = unsafe { $crate::Id::new() };
-let $name = unsafe { $crate::Guard::new(tag) };
+let tag = unsafe { Id::new() };
+let $name = unsafe { Guard::new(tag) };
 let _guard = {
     #[allow(non_camel_case_types)]
-    struct make_guard<'id>(&'id $crate::Id<'id>);
-    impl<'id> ::core::ops::Drop for make_guard<'id> {
+    struct make_guard<'id> {
+        _id: Id<'id>,
+    }
+    impl<'id> Drop for make_guard<'id> {
         #[inline(always)]
         fn drop(&mut self) {}
+    }
+    fn make_guard<'id>(_: &'id Id<'id>) -> make_guard<'id> {
+        make_guard { _id: *id }
     }
     make_guard(&tag)
 };
 ```
 
-See also #1 for further discussion.
+### Disclaimer
+
+This relies on dead code (the empty drop) to impact borrow checking.
+Theoretically, a smarter CFG based borrow checker (i.e. NLL/polonius) *could*
+utilize the fact that this is dead code to remove this restriction, but this is
+*very* unlikely; the current (as of Rust 2021) NLL borrow checker requires dead
+code to be lifetime-correct, and this code isn't *dead* dead, as in, it *runs*,
+it just doesn't actually do anything other than impact lifetime solving. If you
+want to discuss the proof of correctness, the place to do so is issue #1.
 
 ### Unimportant, nicety details
 
-- New unique type per macro invocation: this is merely to avoid having a type in the public API,
-  and such that the compiler emits slightly more useful error messages for lifetime errors.
-- `#[inline(always)]`: This is a micro-optimization not required for safety. This makes it easier
-  for the optimizer to optimize out the `_guard`'s drop implementation.
+- New unique type per macro invocation: this is merely to avoid having a type in
+  the public API, and such that the compiler emits slightly more useful error
+  messages for lifetime errors.
+- `#[inline(always)]`: This is a micro-optimization not required for safety.
+  This makes it easier for the optimizer to optimize out the `_guard`'s drop
+  implementation.
+- `make_guard` is created from `&'id Id<'id>` but only holds `Id<'id>`. While
+  the reference is required to uniquify the lifetime (see below), only `Id<'id>`
+  is required to carry the invariant lifetime.
 
 ### Three places, all required
 
@@ -65,7 +83,7 @@ See also #1 for further discussion.
 
 ### `'id` is unique
 
-- `'id` is _invariant_ due to the invariance of `tag: generativity::Tag<'id>`.
+- `'id` is _invariant_ due to the invariance of `tag: generativity::Id<'id>`.
 - `$name: generativity::Guard<'id>` has the same `'id` because it is created from `tag`.
 - `'id` is restricted by creating `_guard: make_guard(&'id generativity::Tag<'id>)`.
 - The end point of the `'id` lifetime is restricted to be between the drop timing of `tag`
@@ -74,8 +92,10 @@ See also #1 for further discussion.
 - All lifetimes created with `make_guard!` are protected in this manner.
 - All lifetimes created with `make_guard!` are thus mutually ununifyable.
 - It is unsafe to create a `generativity::Guard<'_>` without using `make_guard!`.
-- Therefore, it is impossible to safely create a `generativity::Guard<'_>` that will unify lifetimes with `'id`.
-- Thus, the lifetime created by `make_guard!` is guaranteed unique _in respect to other `generativity` lifetimes_.
+- Therefore, it is impossible to safely create a `generativity::Guard<'_>` that
+  will unify lifetimes with `'id`.
+- Thus, the lifetime created by `make_guard!` is guaranteed unique
+  _with respect to other `generativity` lifetimes_.
 
 ## Huge generativity disclaimer
 
@@ -105,16 +125,17 @@ fn main() {
 }
 ```
 
-Larger lifetimes can still shrink to unify with `'id`. What all this means is that you
-can't just trust any old `'id` lifetime floating around. It has to be carried in a
-trusted carrier; one that can't be created from an untrusted lifetime carrier.
+Larger variant lifetimes can still shrink to unify with `'id`. What all this
+means is that you can't just trust any old `'id` lifetime floating around. It
+has to be carried in a trusted carrier, and one that can't be created from an
+untrusted lifetime carrier.
 
 ## License
 
 Licensed under either of
 
-- Apache License, Version 2.0, (<LICENSE-APACHE> or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license (<LICENSE-MIT> or <http://opensource.org/licenses/MIT>)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
@@ -125,7 +146,4 @@ for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 
   [Discord]: <https://discord.gg/FuPE9JE>
-  [Travis]: <https://travis-ci.com/CAD97/generativity>
-  [Codecov]: <https://codecov.io/gh/CAD97/generativity>
-  
   [variance]: <https://doc.rust-lang.org/nomicon/subtyping.html#variance>
