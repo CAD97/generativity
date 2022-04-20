@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 //! Create a trusted carrier with a new lifetime that is guaranteed to be
 //! unique among other trusted carriers. When you call [`make_guard!`] to make a
@@ -27,7 +27,8 @@
 //! Importantly, non-invariant lifetimes *cannot* be trusted, as the variance
 //! allows lifetimes to be contracted to match and copy the brand lifetime.
 
-use core_::{fmt, marker::PhantomData};
+use core_::fmt;
+use core_::marker::PhantomData;
 
 #[doc(hidden)]
 pub extern crate core as core_;
@@ -94,7 +95,7 @@ impl<'id> Guard<'id> {
     /// "I know what I'm doing" button; restrict the lifetime to a known brand
     /// immediately to avoid accidentally introducing unsoundness potential.
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
-        Guard { id }
+        Guard { id: id }
     }
 }
 
@@ -140,7 +141,7 @@ macro_rules! make_guard {
 #[cfg(test)]
 mod test {
     use super::*;
-    use core_::panic::{RefUnwindSafe, UnwindSafe};
+    use std::panic::{RefUnwindSafe, UnwindSafe};
 
     #[test]
     fn dont_error_in_general() {

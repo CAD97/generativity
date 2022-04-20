@@ -130,6 +130,12 @@ means is that you can't just trust any old `'id` lifetime floating around. It
 has to be carried in a trusted carrier, and one that can't be created from an
 untrusted lifetime carrier.
 
+## Minimum supported Rust version
+
+In theory, this crate should work on even ancient pre-edition Rust versions.
+However, the crate is only tested to work as desired on versions that trybuild
+targets. As of publishing this version of the crate, that is Rust 1.36+.
+
 ## License
 
 Licensed under either of
