@@ -3,22 +3,11 @@ name = "generativity"
 version = "1.0.0"
 edition = "2018"
 
-authors = [
-    "Christopher Durham (cad97) <cad97@cad97.com>",
-    "matthewjasper",
-]
 description = "Generation of unique invariant lifetimes"
 repository = "https://github.com/CAD97/generativity"
-readme = "./README.md"
-keywords = ["generativity","no-std","unsafe-tools"]
-categories = ["no-std","rust-patterns"]
+keywords = ["generativity", "no-std", "unsafe-tools"]
+categories = ["no-std", "rust-patterns"]
 license = "MIT OR Apache-2.0"
 
 [dev-dependencies]
 trybuild = "1.0.4"
-
-[badges]
-travis-ci = { repository = "CAD97/generativity" }
-codecov = { repository = "CAD97/generativity" }
-is-it-maintained-open-issues = { repository = "CAD97/generativity" }
-maintenance = { status = "passively-maintained" }
