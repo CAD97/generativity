@@ -5,8 +5,8 @@
 //! unique lifetime, the macro creates a [`Guard`] to hold it. This guard can be
 //! converted `into` an [`Id`], which can be stored in structures to uniquely
 //! "brand" them. A different invocation of the macro will produce a new
-//! lifetime that cannot be unified. These types have no safe way to construct
-//! them other than via [`make_guard!`] or `unsafe` code.
+//! lifetime that cannot be unified. The only way to construct these types is
+//! with [`make_guard!`] or `unsafe` code.
 //!
 //! ```rust
 //! use generativity::{Id, make_guard};
@@ -18,10 +18,12 @@
 //! This is the concept of "generative" lifetime brands. `Guard` and `Id` are
 //! [invariant](https://doc.rust-lang.org/nomicon/subtyping.html#variance) over
 //! their lifetime parameter, meaning that it is never valid to substitute or
-//! otherwise coerce `Id<'a>` into `Id<'b>`, for *any* `'a` or `'b`, *including*
-//! the `'static` lifetime.
+//! otherwise coerce `Id<'a>` into `Id<'b>`, for *any* concrete `'a` or `'b`,
+//! *including* the `'static` lifetime.
 //!
-//! Any invariant lifetime can be "trusted" to cary a brand, but when using this
+//! Any invariant lifetime can be "trusted" to carry a brand, so long as they
+//! are known to be restricted to carrying a brand, and haven't been derived
+//! from some untrusted lifetime (or are completely unbound). When using this
 //! library, it is recommended to always use `Id<'id>` to carry the brand, as
 //! this reduces the risk of accidentally trusting an untrusted lifetime.
 //! Importantly, non-invariant lifetimes *cannot* be trusted, as the variance
@@ -43,16 +45,16 @@ pub struct Id<'id> {
 }
 
 impl<'id> Id<'id> {
-    /// Construct an `Id` with an unbound lifetime.
+    /// Construct an `Id` with an unbounded lifetime.
     ///
     /// You should not need to use this function; use [`make_guard!`] instead.
     ///
     /// # Safety
     ///
-    /// This creates an unbound invariant lifetime that people are allowed to
-    /// assume means it was derived from their generative brand. This is the
-    /// "I know what I'm doing" button; restrict the lifetime to a known brand
-    /// immediately to avoid accidentally introducing unsoundness potential.
+    /// `Id` holds an invariant lifetime that must be derived from a generative
+    /// brand. Using this function directly is the "I know what I'm doing"
+    /// button; restrict the lifetime to a known brand immediately to avoid
+    /// introducing unsoundness.
     pub unsafe fn new() -> Self {
         Id {
             phantom: PhantomData,
@@ -90,10 +92,10 @@ impl<'id> Guard<'id> {
     ///
     /// # Safety
     ///
-    /// This creates an unbound invariant lifetime that people are allowed to
-    /// assume means it was derived from their generative brand. This is the
-    /// "I know what I'm doing" button; restrict the lifetime to a known brand
-    /// immediately to avoid accidentally introducing unsoundness potential.
+    /// `Guard` holds an invariant lifetime that must be an unused generative
+    /// brand. Using this function directly is the "I know what I'm doing"
+    /// button; restrict the lifetime to a known brand immediately to avoid
+    /// introducing unsoundness.
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
         Guard { id: id }
     }

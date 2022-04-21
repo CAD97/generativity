@@ -28,7 +28,7 @@ hygiene hidden `impl Drop` can be used by any API that would normally use a clos
 argument, such as crossbeam's scoped threads, to make the containing scope the safe,
 wrapped scope if they so desire the trade-off of macro versus closure indentation.
 
-It's important to note that lifetimes are only trusted to cary lifetime brands when they
+It's important to note that lifetimes are only trusted to carry lifetime brands when they
 are in fact invariant. Variant lifetimes, such as `&'a T`, can be shrunk to fit the expected
 lifetime; `&'static T` can be used where `&'a T` is expected, for any `'a`.
 
@@ -61,7 +61,9 @@ utilize the fact that this is dead code to remove this restriction, but this is
 *very* unlikely; the current (as of Rust 2021) NLL borrow checker requires dead
 code to be lifetime-correct, and this code isn't *dead* dead, as in, it *runs*,
 it just doesn't actually do anything other than impact lifetime solving. If you
-want to discuss the proof of correctness, the place to do so is issue #1.
+want to discuss the proof of correctness, the place to do so is [issue #1].
+
+[issue #1]: https://github.com/CAD97/generativity/issues/1
 
 ### Unimportant, nicety details
 
@@ -125,10 +127,10 @@ fn main() {
 }
 ```
 
-Larger variant lifetimes can still shrink to unify with `'id`. What all this
+Other variant lifetimes can still shrink to unify with `'id`. What all this
 means is that you can't just trust any old `'id` lifetime floating around. It
-has to be carried in a trusted carrier, and one that can't be created from an
-untrusted lifetime carrier.
+has to be carried in a trusted carrier, and one that wasn't created from an
+untrusted lifetime.
 
 ## Minimum supported Rust version
 
