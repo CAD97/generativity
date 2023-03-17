@@ -1,39 +1,59 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
+#![doc = include_str!("../README.md")]
 
-//! Create a trusted carrier with a new lifetime that is guaranteed to be
-//! unique among other trusted carriers. When you call [`make_guard!`] to make a
-//! unique lifetime, the macro creates a [`Guard`] to hold it. This guard can be
-//! converted `into` an [`Id`], which can be stored in structures to uniquely
-//! "brand" them. A different invocation of the macro will produce a new
-//! lifetime that cannot be unified. The only way to construct these types is
-//! with [`make_guard!`] or `unsafe` code.
-//!
-//! ```rust
-//! use generativity::{Id, make_guard};
-//! struct Struct<'id>(Id<'id>);
-//! make_guard!(a);
-//! Struct(a.into());
-//! ```
-//!
-//! This is the concept of "generative" lifetime brands. `Guard` and `Id` are
-//! [invariant](https://doc.rust-lang.org/nomicon/subtyping.html#variance) over
-//! their lifetime parameter, meaning that it is never valid to substitute or
-//! otherwise coerce `Id<'a>` into `Id<'b>`, for *any* concrete `'a` or `'b`,
-//! *including* the `'static` lifetime.
-//!
-//! Any invariant lifetime can be "trusted" to carry a brand, so long as they
-//! are known to be restricted to carrying a brand, and haven't been derived
-//! from some untrusted lifetime (or are completely unbound). When using this
-//! library, it is recommended to always use `Id<'id>` to carry the brand, as
-//! this reduces the risk of accidentally trusting an untrusted lifetime.
-//! Importantly, non-invariant lifetimes *cannot* be trusted, as the variance
-//! allows lifetimes to be contracted to match and copy the brand lifetime.
+//  NB: trybuild tests (error messages) include line numbers from this macro,
+//      so doc changes will require re-blessing the tests, unfortunately.
+#[macro_export]
+macro_rules! guard {
+    // make a local binding guard (statement macro)
+    {let $($name:pat),+ $(,)?} => {
+        $(
+            let id = unsafe { $crate::Id::new() };
+            let brand = unsafe { $crate::Brand::tie(&id) };
+            let $name = unsafe { $crate::Guard::tie(&brand) };
+        )*
+    };
+    // make a temporary guard (expression macro)
+    () => {
+        // SAFETY: oh god, what have I done
+        unsafe { $crate::Guard::tie(&$crate::Brand::tie(&$crate::Id::new())) }
+    };
+}
 
-use core_::fmt;
-use core_::marker::PhantomData;
+// ! Create a trusted carrier with a new lifetime that is guaranteed to be
+// ! unique among other trusted carriers. When you call [`make_guard!`] to make a
+// ! unique lifetime, the macro creates a [`Guard`] to hold it. This guard can be
+// ! converted `into` an [`Id`], which can be stored in structures to uniquely
+// ! "brand" them. A different invocation of the macro will produce a new
+// ! lifetime that cannot be unified. The only way to construct these types is
+// ! with [`make_guard!`] or `unsafe` code.
+// !
+// ! ```rust
+// ! use generativity::{Id, make_guard};
+// ! struct Struct<'id>(Id<'id>);
+// ! make_guard!(a);
+// ! Struct(a.into());
+// ! ```
+// !
+// ! This is the concept of "generative" lifetime brands. `Guard` and `Id` are
+// ! [invariant](https://doc.rust-lang.org/nomicon/subtyping.html#variance) over
+// ! their lifetime parameter, meaning that it is never valid to substitute or
+// ! otherwise coerce `Id<'a>` into `Id<'b>`, for *any* concrete `'a` or `'b`,
+// ! *including* the `'static` lifetime.
+// !
+// ! Any invariant lifetime can be "trusted" to carry a brand, so long as they
+// ! are known to be restricted to carrying a brand, and haven't been derived
+// ! from some untrusted lifetime (or are completely unbound). When using this
+// ! library, it is recommended to always use `Id<'id>` to carry the brand, as
+// ! this reduces the risk of accidentally trusting an untrusted lifetime.
+// ! Importantly, non-invariant lifetimes *cannot* be trusted, as the variance
+// ! allows lifetimes to be contracted to match and copy the brand lifetime.
+
+use core::fmt;
+use core::marker::PhantomData;
 
 #[doc(hidden)]
-pub extern crate core as core_;
+pub extern crate core;
 
 /// A phantomdata-like type taking a single invariant lifetime.
 ///
@@ -41,9 +61,10 @@ pub extern crate core as core_;
 /// [`Guard`]. Use `guard.into()` to create a new `Id`.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Id<'id> {
-    phantom: PhantomData<fn(&'id ()) -> &'id ()>,
+    marker: PhantomData<fn(&'id ()) -> &'id ()>,
 }
 
+#[doc(hidden)]
 impl<'id> Id<'id> {
     /// Construct an `Id` with an unbounded lifetime.
     ///
@@ -57,7 +78,7 @@ impl<'id> Id<'id> {
     /// introducing unsoundness.
     pub unsafe fn new() -> Self {
         Id {
-            phantom: PhantomData,
+            marker: PhantomData,
         }
     }
 }
@@ -85,6 +106,7 @@ pub struct Guard<'id> {
     id: Id<'id>,
 }
 
+#[doc(hidden)]
 impl<'id> Guard<'id> {
     /// Construct a `Guard` with an unbound lifetime.
     ///
@@ -97,13 +119,34 @@ impl<'id> Guard<'id> {
     /// button; restrict the lifetime to a known brand immediately to avoid
     /// introducing unsoundness.
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
-        Guard { id: id }
+        Guard { id }
+    }
+
+    pub unsafe fn tie(brand: &Brand<'id>) -> Guard<'id> {
+        Guard::new(brand.id)
     }
 }
 
 impl<'id> fmt::Debug for Guard<'id> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("#[unique] 'id").finish()
+    }
+}
+
+#[doc(hidden)]
+pub struct Brand<'id> {
+    id: Id<'id>,
+}
+
+impl Drop for Brand<'_> {
+    #[inline(always)]
+    fn drop(&mut self) {}
+}
+
+#[doc(hidden)]
+impl<'id> Brand<'id> {
+    pub unsafe fn tie(&id: &'id Id<'id>) -> Self {
+        Brand { id }
     }
 }
 
@@ -121,36 +164,31 @@ impl<'id> fmt::Debug for Guard<'id> {
 #[macro_export]
 macro_rules! make_guard {
     ($name:ident) => {
-        let tag = unsafe { $crate::Id::new() };
-        let $name = unsafe { $crate::Guard::new(tag) };
-        let _guard = {
-            #[allow(non_camel_case_types)]
-            struct make_guard<'id> {
-                _id: $crate::Id<'id>,
-            }
-            impl<'id> $crate::core_::ops::Drop for make_guard<'id> {
-                #[inline(always)]
-                fn drop(&mut self) {}
-            }
-            fn make_guard<'id>(id: &'id $crate::Id<'id>) -> make_guard<'id> {
-                make_guard { _id: *id }
-            }
-            make_guard(&tag)
-        };
+        $crate::guard!(let $name);
     };
 }
+
+// fn test_let() {
+//     let a = guard!();
+//     drop(a);
+// }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::panic::{RefUnwindSafe, UnwindSafe};
+    use core::panic::{RefUnwindSafe, UnwindSafe};
 
     #[test]
-    fn dont_error_in_general() {
-        make_guard!(a);
-        make_guard!(b);
+    fn statement_guard_is_usable() {
+        guard!(let a);
+        guard!(let b);
         assert_eq!(a, a);
         assert_eq!(b, b);
+    }
+
+    #[test]
+    fn expression_guard_is_usable() {
+        guard!();
     }
 
     #[test]
@@ -161,7 +199,7 @@ mod test {
         {
         }
 
-        make_guard!(a);
+        guard!(let a);
         assert_oibits(&a);
         let id: Id<'_> = a.into();
         assert_oibits(&id);

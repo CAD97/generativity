@@ -34,7 +34,7 @@ lifetime; `&'static T` can be used where `&'a T` is expected, for any `'a`.
 
 ## Informal proof of correctness
 
-```rust
+```rust,ignore
 let tag = unsafe { Id::new() };
 let $name = unsafe { Guard::new(tag) };
 let _guard = {
@@ -106,6 +106,8 @@ lifetime is fully unique. We can only guarantee that it's unique among trusted
 carriers. This applies equally to the traditional method:
 
 ```rust
+use generativity::*;
+
 fn scope<F>(f: F)
 where F: for<'id> FnOnce(Guard<'id>)
 {
@@ -118,12 +120,11 @@ fn unify<'a>(_: &'a (), _: &Guard<'a>) {
 }
 
 fn main() {
-    let place = ();
     make_guard!(guard);
-    unify(&place, &guard);
+    unify(&(), &guard);
     scope(|guard| {
-        unify(&place, &guard);
-    })
+        unify(&(), &guard);
+    });
 }
 ```
 
