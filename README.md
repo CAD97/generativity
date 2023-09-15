@@ -24,80 +24,45 @@ This effectively does the same thing as wrapping the rest of the function in an
 immediately invoked closure. We do some pre-work (create the tag and give the caller the
 guard), run the user code (the code after here, the closure previously), and then run
 some cleanup code after (in the drop implementation). This same technique of a macro
-hygiene hidden `impl Drop` can be used by any API that would normally use a closure
-argument, such as crossbeam's scoped threads, to make the containing scope the safe,
-wrapped scope if they so desire the trade-off of macro versus closure indentation.
+hygiene hidden `impl Drop` can be used by most APIs that would normally use a closure
+argument, enabling them to avoid introducing a closure boundary to control flow "effect"s
+such as `async.await` and `?`. But this also comes with a subtle downside: being able to
+`.await` means that locals could be forgotten instead of dropped, and thus the drop glue
+must not be relied on to run for soundness. This is okay for this crate, since the actual
+drop impl is a no-op that just exists for the lifetime analysis impacts, but it means that
+more interesting cases like scoped threads still need to use a closure callback to ensure
+their soundness-critical cleanup gets run (e.g. to wait on and join the scoped threads).
 
 It's important to note that lifetimes are only trusted to carry lifetime brands when they
-are in fact invariant. Variant lifetimes, such as `&'a T`, can be shrunk to fit the expected
-lifetime; `&'static T` can be used where `&'a T` is expected, for any `'a`.
+are in fact invariant. Variant lifetimes, such as `&'a T`, can still be shrunk to fit the
+branded lifetime; `&'static T` can be used where `&'a T` is expected, for *any* `'a`.
 
-## Informal proof of correctness
+## How does it work?
 
 ```rust
-let tag = unsafe { Id::new() };
-let $name = unsafe { Guard::new(tag) };
-let _guard = {
-    #[allow(non_camel_case_types)]
-    struct make_guard<'id> {
-        _id: Id<'id>,
-    }
-    impl<'id> Drop for make_guard<'id> {
-        #[inline(always)]
-        fn drop(&mut self) {}
-    }
-    fn make_guard<'id>(_: &'id Id<'id>) -> make_guard<'id> {
-        make_guard { _id: *id }
-    }
-    make_guard(&tag)
-};
+// SAFETY: The lifetime given to `$name` is unique among trusted brands.
+// We know this because of how we carefully control drop timing here.
+// The branded lifetime's end is bound to be no later than when the
+// `branded_place` is invalidated at the end of scope, but also must be
+// no sooner than `lifetime_brand` is dropped, also at the end of scope.
+// Some other variant lifetime could be constrained to be equal to the
+// brand lifetime, but no other lifetime branded by `make_guard!` can,
+// as its brand lifetime has a distinct drop time from this one. QED
+let branded_place = unsafe { $crate::Id::new() };
+#[allow(unused)]
+let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
+// implicit when exiting scope: drop(lifetime_brand), as LifetimeBrand: Drop
+let $name = unsafe { $crate::Guard::new(branded_place) };
 ```
 
-### Disclaimer
+A previous version of this crate emitted more code in the macro, and defined the
+`LifetimeBrand` type inline. This improved compiler errors on compiler versions
+from the time, but the current compiler produces an equivalently good or better
+error with `LifetimeBrand` defined in the `generativity` crate.
 
-This relies on dead code (the empty drop) to impact borrow checking.
-Theoretically, a smarter CFG based borrow checker (i.e. NLL/polonius) *could*
-utilize the fact that this is dead code to remove this restriction, but this is
-*very* unlikely; the current (as of Rust 2021) NLL borrow checker requires dead
-code to be lifetime-correct, and this code isn't *dead* dead, as in, it *runs*,
-it just doesn't actually do anything other than impact lifetime solving. If you
-want to discuss the proof of correctness, the place to do so is [issue #1].
-
-[issue #1]: https://github.com/CAD97/generativity/issues/1
-
-### Unimportant, nicety details
-
-- New unique type per macro invocation: this is merely to avoid having a type in
-  the public API, and such that the compiler emits slightly more useful error
-  messages for lifetime errors.
-- `#[inline(always)]`: This is a micro-optimization not required for safety.
-  This makes it easier for the optimizer to optimize out the `_guard`'s drop
-  implementation.
-- `make_guard` is created from `&'id Id<'id>` but only holds `Id<'id>`. While
-  the reference is required to uniquify the lifetime (see below), only `Id<'id>`
-  is required to carry the invariant lifetime.
-
-### Three places, all required
-
-- `$name` is the user-named `#[unique] 'id` type that we give to the calling context.
-- `tag` is a location that we use to define the `'id` lifetime without restricting `$name`.
-- `_guard` is an `impl Drop` that we use to restrict `'id`.
-
-### `'id` is unique
-
-- `'id` is _invariant_ due to the invariance of `tag: generativity::Id<'id>`.
-- `$name: generativity::Guard<'id>` has the same `'id` because it is created from `tag`.
-- `'id` is restricted by creating `_guard: make_guard(&'id generativity::Tag<'id>)`.
-- The end point of the `'id` lifetime is restricted to be between the drop timing of `tag`
-  (which it borrows) and the drop timing of `_guard: make_guard(&'id tag)` (which holds it).
-- Therefore, no lifetime can unify with `'id` unless it ends in the same region.
-- All lifetimes created with `make_guard!` are protected in this manner.
-- All lifetimes created with `make_guard!` are thus mutually ununifyable.
-- It is unsafe to create a `generativity::Guard<'_>` without using `make_guard!`.
-- Therefore, it is impossible to safely create a `generativity::Guard<'_>` that
-  will unify lifetimes with `'id`.
-- Thus, the lifetime created by `make_guard!` is guaranteed unique
-  _with respect to other `generativity` lifetimes_.
+The `LifetimeBrand` type is *not public API* and must not be used directly. It
+is not covered by stability guarantees; only usage of `make_guard!` and other
+documented APIs are considered stable.
 
 ## Huge generativity disclaimer
 
@@ -132,11 +97,30 @@ means is that you can't just trust any old `'id` lifetime floating around. It
 has to be carried in a trusted carrier, and one that wasn't created from an
 untrusted lifetime.
 
+## Impl Disclaimer
+
+This relies on dead code (an `#[inline(always)]` no-op drop) to impact borrow
+checking. In theory, a sufficiently advanced borrow checker looking at the CFG
+after some inlining would be able to see that dropping `lifetime_brand` doesn't
+require the captured lifetime to be live, and destroy the uniqueness guarantee
+which we've created. This would be much more difficult with the higher-ranked
+closure formulation, but would still theoretically be possible with sufficient
+inlining. Thankfully, based on the direction around the unstable "borrowck
+eyepatch" which is the reason e.g. `Box<&'a T>` can be dropped at end of scope
+despite the `&'a T` borrow being invalidated beforehand, and the further
+stability implications of inferring whether a generic is "used" by `Drop::drop`,
+it seems like any such weakening of an explicit `impl Drop` "using" captured
+lifetimes in the eyes of borrowck will be opt-in. This crate won't opt in to
+such a feature, and thus will remain sound.
+
 ## Minimum supported Rust version
 
-In theory, this crate should work on even ancient pre-edition Rust versions.
-However, the crate is only tested to work as desired on versions that trybuild
-targets. As of publishing this version of the crate, that is Rust 1.36+.
+The crate compiles with ancient versions of the Rust compiler; it is tested to
+compile on 1.16. However, we only run the tests on the oldest compiler supported
+by trybuild. At the time of publishing, this is 1.56.
+
+I have no intent of increasing the compiler version requirement of this crate.
+However, this is only guaranteed within a given minor version number.
 
 ## License
 

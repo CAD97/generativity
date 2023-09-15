@@ -1,5 +1,0 @@
-error[E0601]: `main` function not found in crate `$CRATE`
- --> tests/ui/is_trans_compatible.rs:5:48
-  |
-5 | pub struct BOption<'id, T>(Option<T>, Id<'id>);
-  |                                                ^ consider adding a `main` function to `$DIR/tests/ui/is_trans_compatible.rs`
