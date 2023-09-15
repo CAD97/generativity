@@ -5,69 +5,43 @@ on:
     branches:
       - main
 
-env:
-  CARGO_INCREMENTAL: 0
-  CARGO_NET_RETRY: 10
-  RUSTUP_MAX_RETRIES: 10
-  RUST_BACKTRACE: short
-
 jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
+        uses: dtolnay/rust-toolchain@nightly
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --all-targets --no-fail-fast
+        run: cargo test --all-features --all-targets --no-fail-fast
 
   # Versions before Unpin; can't check tests which statically check Unpin OIBIT
   msrv-low:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install 1.16 toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.16
-          profile: minimal
-          override: true
+        uses: dtolnay/rust-toolchain@1.16
 
       - name: Check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
+        run: cargo check
 
-  # Versions afterr Unpin; check tests which statically check Unpin OIBIT
+  # Versions after Unpin; check tests which statically check Unpin OIBIT
   msrv-high:
     runs-on: ubuntu-latest
     env:
       TRYBUILD: overwrite
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install 1.36 toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.36
-          profile: minimal
-          override: true
+      - name: Install 1.33 toolchain
+        uses: dtolnay/rust-toolchain@1.33
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --all-targets --no-fail-fast
+        run: cargo test --all-features --lib --no-fail-fast
