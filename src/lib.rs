@@ -39,6 +39,7 @@ pub extern crate core as core_;
 ///
 /// Used to manipulate and store the unique invariant lifetime obtained from
 /// [`Guard`]. Use `guard.into()` to create a new `Id`.
+#[repr(transparent)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Id<'id> {
     phantom: PhantomData<fn(&'id ()) -> &'id ()>,
@@ -79,6 +80,7 @@ impl<'id> From<Guard<'id>> for Id<'id> {
 ///
 /// In effect, this means that `'id` is a "generative brand". Use [`make_guard`]
 /// to obtain a new `Guard`.
+#[repr(transparent)]
 #[derive(Eq, PartialEq)]
 pub struct Guard<'id> {
     #[allow(unused)]

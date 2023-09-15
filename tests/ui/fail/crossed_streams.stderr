@@ -1,8 +1,11 @@
 error[E0597]: `tag` does not live long enough
- --> $DIR/crossed_streams.rs:5:5
+ --> tests/ui/fail/crossed_streams.rs:5:5
   |
 5 |     make_guard!(b);
-  |     ^^^^^^^^^^^^^^ borrowed value does not live long enough
+  |     ^^^^^^^^^^^^^^
+  |     |
+  |     borrowed value does not live long enough
+  |     binding `tag` declared here
 6 |     dbg!(a == b); // ERROR (here == is a static check)
 7 | }
   | -
