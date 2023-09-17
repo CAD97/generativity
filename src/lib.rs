@@ -115,7 +115,7 @@ impl<'id> Guard<'id> {
     /// button; restrict the lifetime to a known brand immediately to avoid
     /// introducing potential unsoundness.
     pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
-        Guard { id: id }
+        Guard { id }
     }
 }
 

@@ -115,11 +115,9 @@ such a feature, and thus will remain sound.
 
 ## Minimum supported Rust version
 
-The crate compiles with ancient versions of the Rust compiler; it is tested to
-compile on 1.28. However, we only run the tests on the current compiler version.
-
-I have no intent of increasing the compiler version requirement of this crate.
-However, this is only guaranteed within a given minor version number.
+The crate is tested to compile on 1.55. I have no intent of increasing the
+compiler version requirement of this crate beyond this. However, this is only
+guaranteed within a given minor version number.
 
 ## License
 

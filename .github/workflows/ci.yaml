@@ -18,36 +18,14 @@ jobs:
       - name: Run tests
         run: cargo test --all-features --all-targets --no-fail-fast
 
-  # Versions before Unpin; can't check tests which statically check Unpin OIBIT
-  msrv-low:
+  msrv:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Adjust manifest for msrv
-        run: mv -f Cargo.msrv.toml Cargo.toml
-
-      - name: Install 1.28 toolchain
+      - name: Install 1.55 toolchain
         uses: dtolnay/rust-toolchain@1.28
 
-      - name: Check
-        run: cargo check
-
-  # Versions after Unpin; check tests which statically check Unpin OIBIT
-  msrv-high:
-    runs-on: ubuntu-latest
-    env:
-      TRYBUILD: overwrite
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Adjust manifest for msrv
-        run: mv -f Cargo.msrv.toml Cargo.toml
-
-      - name: Install 1.33 toolchain
-        uses: dtolnay/rust-toolchain@1.33
-
       - name: Run tests
-        run: cargo test --all-features --lib --no-fail-fast
+        run: cargo test --all-features --all-targets --no-fail-fast
