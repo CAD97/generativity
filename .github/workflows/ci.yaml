@@ -35,7 +35,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.16
 
       - name: Check
-        run: cargo +1.16 check
+        run: cargo +1.16.0 check
 
   # Versions after Unpin; check tests which statically check Unpin OIBIT
   msrv-high:
@@ -56,4 +56,4 @@ jobs:
         uses: dtolnay/rust-toolchain@1.33
 
       - name: Run tests
-        run: cargo +1.33 test --all-features --lib --no-fail-fast
+        run: cargo +1.33.0 test --all-features --lib --no-fail-fast
