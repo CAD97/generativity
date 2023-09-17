@@ -25,11 +25,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Create lockfile
+        run: cargo +nightly generate-lockfile -Zminimal-versions
+
       - name: Install 1.16 toolchain
         uses: dtolnay/rust-toolchain@1.16
 
       - name: Check
-        run: cargo check
+        run: cargo +1.16 check
 
   # Versions after Unpin; check tests which statically check Unpin OIBIT
   msrv-high:
@@ -40,8 +46,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Create lockfile
+        run: cargo +nightly generate-lockfile -Zminimal-versions
+
       - name: Install 1.33 toolchain
         uses: dtolnay/rust-toolchain@1.33
 
       - name: Run tests
-        run: cargo test --all-features --lib --no-fail-fast
+        run: cargo +1.33 test --all-features --lib --no-fail-fast
