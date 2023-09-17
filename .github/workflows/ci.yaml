@@ -28,8 +28,8 @@ jobs:
       - name: Adjust manifest for msrv
         run: mv -f Cargo.msrv.toml Cargo.toml
 
-      - name: Install 1.16 toolchain
-        uses: dtolnay/rust-toolchain@1.16
+      - name: Install 1.28 toolchain
+        uses: dtolnay/rust-toolchain@1.28
 
       - name: Check
         run: cargo check
