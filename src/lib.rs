@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 //! Create a trusted carrier with a new lifetime that is guaranteed to be
 //! unique among other trusted carriers. When you call [`make_guard!`] to make a
@@ -72,10 +72,12 @@ impl<'id> Id<'id> {
     /// brand. Using this function directly is the "I know what I'm doing"
     /// button; restrict the lifetime to a known brand immediately to avoid
     /// introducing potential unsoundness.
-    pub unsafe fn new() -> Self {
-        Id {
-            phantom: PhantomData,
-        }
+    #[inline(always)]
+    pub const unsafe fn new() -> Self {
+        // HACK: using `transmute` here lets us call `Id::new` in const contexts on older rust versions.
+        // Without it, the compiler complains about the function pointer in the PhantomData field.
+        // SAFETY: PhantomData is always safe to create
+        core_::mem::transmute(())
     }
 }
 
@@ -86,6 +88,7 @@ impl<'id> fmt::Debug for Id<'id> {
 }
 
 impl<'id> From<Guard<'id>> for Id<'id> {
+    #[inline(always)]
     fn from(guard: Guard<'id>) -> Self {
         guard.id
     }
@@ -114,7 +117,8 @@ impl<'id> Guard<'id> {
     /// brand. Using this function directly is the "I know what I'm doing"
     /// button; restrict the lifetime to a known brand immediately to avoid
     /// introducing potential unsoundness.
-    pub unsafe fn new(id: Id<'id>) -> Guard<'id> {
+    #[inline(always)]
+    pub const unsafe fn new(id: Id<'id>) -> Guard<'id> {
         Guard { id }
     }
 }
@@ -174,7 +178,7 @@ impl<'id> LifetimeBrand<'id> {
 /// ```
 #[macro_export]
 macro_rules! make_guard {
-    ($name:ident) => {
+    ($($name:ident),* $(,)?) => {$(
         // SAFETY: The lifetime given to `$name` is unique among trusted brands.
         // We know this because of how we carefully control drop timing here.
         // The branded lifetime's end is bound to be no later than when the
@@ -183,17 +187,19 @@ macro_rules! make_guard {
         // Some other variant lifetime could be constrained to be equal to the
         // brand lifetime, but no other lifetime branded by `make_guard!` can,
         // as its brand lifetime has a distinct drop time from this one. QED
-        let branded_place = unsafe { $crate::Id::new() };
-        #[allow(unused)]
-        let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
-        let $name = unsafe { $crate::Guard::new(branded_place) };
-    };
+        #[allow(unused_unsafe)]
+        let $name = unsafe { $crate::Id::new() };
+        #[allow(unused, unused_unsafe)]
+        let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&$name) };
+        #[allow(unused_unsafe)]
+        let $name = unsafe { $crate::Guard::new($name) };
+    )*};
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::panic::{RefUnwindSafe, UnwindSafe};
+    use core_::panic::{RefUnwindSafe, UnwindSafe};
 
     #[test]
     fn dont_error_in_general() {
@@ -201,6 +207,14 @@ mod test {
         make_guard!(b);
         assert_eq!(a, a);
         assert_eq!(b, b);
+    }
+
+    #[test]
+    fn multiple_guards() {
+        make_guard!(a, b, c);
+        assert_eq!(a, a);
+        assert_eq!(b, b);
+        assert_eq!(c, c);
     }
 
     #[test]
