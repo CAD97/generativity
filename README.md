@@ -113,6 +113,12 @@ it seems like any such weakening of an explicit `impl Drop` "using" captured
 lifetimes in the eyes of borrowck will be opt-in. This crate won't opt in to
 such a feature, and thus will remain sound.
 
+However, in the specific case that the containing function returns `!` (is known
+to diverge at the type level), it is possible to get borrow checking to ignore
+the impact of drop glue, if it is never reached in any arm. `make_guard!` will
+refuse to compile in this case; in the case of any other return type, we ensure
+that the drop glue is considered in determining the full lifetime of the brand.
+
 ## Minimum supported Rust version
 
 The crate currently requires Rust 1.85. I have no intent of increasing the
