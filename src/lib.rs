@@ -187,7 +187,75 @@ macro_rules! make_guard {
         #[allow(unused)]
         let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
         let $name = unsafe { $crate::Guard::new(branded_place) };
+        if false {
+            // Prelude for poorman's specialization.
+            #[allow(unused)]
+            use $crate::__private::DefaultGet as __;
+            #[allow(unreachable_code)] {
+                let p = $crate::__private::Phony;
+                if false {
+                    // Help inference make out that the type param here is that
+                    // of the return type.
+                    return $crate::__private::DefaultGet::get(&p);
+                }
+                return p.get();
+            }
+        }
     };
+}
+
+#[doc(hidden)]
+/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+pub mod __private {
+    use super::*;
+
+    pub enum Phony<T> {
+        Phony,
+        _PhantomVariant(Never, PhantomData<T>),
+    }
+    pub use self::Phony::*;
+
+    pub trait DefaultGet<T> {
+        fn get(&self) -> T { unreachable!() }
+    }
+
+    impl<T> DefaultGet<T> for Phony<T> {}
+
+    /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
+    mod never_say_never {
+        pub trait FnPtr { type Never; }
+        impl<R> FnPtr for fn() -> R { type Never = R; }
+    }
+    type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
+
+    impl Phony<Never> {
+        pub fn get(&self) -> Never
+        where
+            for<'n> Never : sealed::SupportedReturnType,
+        {
+            unreachable!()
+        }
+    }
+}
+
+mod sealed {
+    #[diagnostic::on_unimplemented(
+        message = "\
+            `make_guard!()` cannot be used in a diverging/`!`-returning function\
+        ",
+        label = "encompassing functions \"diverges\", i.e., returns `-> !`",
+        note = "\
+            `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
+            are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \
+            and also if the return type of the encompassing function is `!`, for technical reasons. \
+            \n\
+            \n\
+            To this day, no workaround is known, so there is no other choice but to reject the \
+            `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
+            other single instance of `make_guard!()` to remain sound.\
+        ",
+    )]
+    pub trait SupportedReturnType {}
 }
 
 #[cfg(test)]
