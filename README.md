@@ -115,7 +115,7 @@ such a feature, and thus will remain sound.
 
 ## Minimum supported Rust version
 
-The crate currently requires Rust 1.56. I have no intent of increasing the
+The crate currently requires Rust 1.85. I have no intent of increasing the
 compiler version requirement of this crate beyond this. However, this is only
 guaranteed within a given minor version number.
 
