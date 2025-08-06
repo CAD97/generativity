@@ -1,8 +1,8 @@
 [package]
 name = "generativity"
 version = "1.1.0"
-edition = "2021"
-rust-version = "1.56"
+edition = "2024"
+rust-version = "1.85"
 
 description = "Generation of unique invariant lifetimes"
 repository = "https://github.com/CAD97/generativity"
@@ -11,4 +11,6 @@ categories = ["no-std", "rust-patterns"]
 license = "MIT OR Apache-2.0"
 
 [dev-dependencies]
-trybuild = "1.0.85"
+
+[dependencies]
+trybuild = "1.0.110"

@@ -24,8 +24,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install 1.56 toolchain
-        uses: dtolnay/rust-toolchain@1.56
+      - name: Install 1.85 toolchain
+        uses: dtolnay/rust-toolchain@1.85
 
       - name: Check tests
         run: cargo test --all-features --no-run
