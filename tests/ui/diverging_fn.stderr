@@ -4,18 +4,18 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
 6 |     make_guard!(g_a);
   |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", i.e., returns `-> !`
   |
-  = help: the trait `generativity::sealed::SupportedReturnType` is not implemented for `!`
+  = help: the trait `__private::sealed::SupportedReturnType` is not implemented for `!`
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
-note: required by a bound in `generativity::__private::Phony::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::get`
+note: required by a bound in `__private::<impl generativity::__private::Phony<<fn() -> ! as __private::never_say_never::FnPtr>::Never>>::get`
    --> src/lib.rs
     |
     |         pub fn get(&self) -> Never
     |                --- required by a bound in this associated function
-    |         where
-    |             for<'n> Never : sealed::SupportedReturnType,
-    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Phony::<<fn() -> ! as FnPtr>::Never>::get`
+...
+    |             for<'trivial> Never : sealed::SupportedReturnType,
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `__private::<impl Phony<<fn() -> ! as FnPtr>::Never>>::get`
     = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning function
@@ -24,16 +24,16 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
 7 |     make_guard!(g_b);
   |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", i.e., returns `-> !`
   |
-  = help: the trait `generativity::sealed::SupportedReturnType` is not implemented for `!`
+  = help: the trait `__private::sealed::SupportedReturnType` is not implemented for `!`
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
-note: required by a bound in `generativity::__private::Phony::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::get`
+note: required by a bound in `__private::<impl generativity::__private::Phony<<fn() -> ! as __private::never_say_never::FnPtr>::Never>>::get`
    --> src/lib.rs
     |
     |         pub fn get(&self) -> Never
     |                --- required by a bound in this associated function
-    |         where
-    |             for<'n> Never : sealed::SupportedReturnType,
-    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Phony::<<fn() -> ! as FnPtr>::Never>::get`
+...
+    |             for<'trivial> Never : sealed::SupportedReturnType,
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `__private::<impl Phony<<fn() -> ! as FnPtr>::Never>>::get`
     = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)

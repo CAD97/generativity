@@ -190,7 +190,7 @@ macro_rules! make_guard {
         if false {
             // Prelude for poorman's specialization.
             #[allow(unused)]
-            use $crate::__private::DefaultGet as __;
+            use $crate::__private::DefaultGet as _;
             #[allow(unreachable_code)] {
                 let p = $crate::__private::Phony;
                 if false {
@@ -207,19 +207,23 @@ macro_rules! make_guard {
 #[doc(hidden)]
 /// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
 pub mod __private {
-    use super::*;
-
-    pub enum Phony<T> {
-        Phony,
-        _PhantomVariant(Never, PhantomData<T>),
+    /// Custom `PhantomData` pattern.
+    ///
+    /// See https://docs.rs/ghost or
+    /// https://github.com/dtolnay/case-studies/tree/master/unit-type-parameters
+    /// for more info.
+    pub use custom_phantom::Phony;
+    mod custom_phantom {
+        pub enum Phony<T> {
+            Phony,
+            // uninhabited ZST payload to make this branch itself uninhabited,
+            // and `Self`, a ZST.
+            _PhantomVariant(super::Never, ::core::marker::PhantomData<T>),
+        }
+        // Bring `self::Phony::Phony` from the value namespace into scope, but
+        // don't make `self::Phony::Phony {}` from the type namespace clash.
+        pub use self::Phony::*;
     }
-    pub use self::Phony::*;
-
-    pub trait DefaultGet<T> {
-        fn get(&self) -> T { unreachable!() }
-    }
-
-    impl<T> DefaultGet<T> for Phony<T> {}
 
     /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
     mod never_say_never {
@@ -228,34 +232,45 @@ pub mod __private {
     }
     type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
 
+    /// Poorman's specialization for `Phony::<default T / override !>::get()`.
+    pub trait DefaultGet<T> {
+        fn get(&self) -> T { unreachable!() }
+    }
+
+    impl<T> DefaultGet<T> for Phony<T> {}
+
     impl Phony<Never> {
+        /// Uncallable method, via an unmet predicate.
         pub fn get(&self) -> Never
         where
-            for<'n> Never : sealed::SupportedReturnType,
+            // Clause needs to involve some lifetime parameter in order not to
+            // cause a `trivial_bounds` eager error.
+            // `for<'trivial>` is the "typical" workaround so far.
+            for<'trivial> Never : sealed::SupportedReturnType,
         {
             unreachable!()
         }
     }
-}
 
-mod sealed {
-    #[diagnostic::on_unimplemented(
-        message = "\
-            `make_guard!()` cannot be used in a diverging/`!`-returning function\
-        ",
-        label = "encompassing functions \"diverges\", i.e., returns `-> !`",
-        note = "\
-            `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
-            are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \
-            and also if the return type of the encompassing function is `!`, for technical reasons. \
-            \n\
-            \n\
-            To this day, no workaround is known, so there is no other choice but to reject the \
-            `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
-            other single instance of `make_guard!()` to remain sound.\
-        ",
-    )]
-    pub trait SupportedReturnType {}
+    mod sealed {
+        #[diagnostic::on_unimplemented(
+            message = "\
+                `make_guard!()` cannot be used in a diverging/`!`-returning function\
+            ",
+            label = "encompassing functions \"diverges\", i.e., returns `-> !`",
+            note = "\
+                `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
+                are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \
+                and also if the return type of the encompassing function is `!`, for technical reasons. \
+                \n\
+                \n\
+                To this day, no workaround is known, so there is no other choice but to reject the \
+                `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
+                other single instance of `make_guard!()` to remain sound.\
+            ",
+        )]
+        pub trait SupportedReturnType {}
+    }
 }
 
 #[cfg(test)]
