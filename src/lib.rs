@@ -187,29 +187,37 @@ macro_rules! make_guard {
         #[allow(unused)]
         let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
         let $name = unsafe { $crate::Guard::new(branded_place) };
+
+        // The whole following `if false {}` block has only one role: to handle
+        // the case where follow-up code might diverge.
+        // See https://github.com/CAD97/generativity/issues/15 for more info.
         if false {
-            // Prelude for poorman's specialization.
-            #[allow(unused)]
-            use $crate::__private::DefaultGet as _;
             #[allow(unreachable_code)] {
-                let phony = $crate::__private::Phony;
+                let phantom_ret_ty = $crate::__private::PhantomReturnType::<_>::NEW;
                 if false {
-                    // Help inference make out that the type param here is that
-                    // of the return type.
-                    return $crate::__private::DefaultGet::get(&phony);
+                    // Use inference to set the type parameter to that of the return type.
+                    return $crate::__private::DefaultReify::reify(&phantom_ret_ty);
                 }
-                // Guarding against `Phony<!>` itself does not suffice, we may
-                // be dealing with `Phony<(!, !)>`, for instance.
+
+                // Guarding against `PhantomReturnType<!>` itself does not suffice,
+                // we may be dealing with `PhantomReturnType<(!, !)>`, for instance.
                 //
                 // Observation: the very same mechanism which causes us trouble
                 // yields an `unreachable_code` warning in the following situation:
                 if false {
-                    let _reified_ret = $crate::__private::DefaultGet::get(&phony);
+                    let _reified_ret =
+                        $crate::__private::DefaultReify::reify(&phantom_ret_ty);
                     #[forbid(unreachable_code)] {
-                        if false {}
+                        // any arbitrary statement works to trigger the lint.
+                        if true {}
                     }
                 }
-                return phony.get();
+
+                // Poorman's specialization; only shadowed in the
+                // `PhantomReturnType<!>` case.
+                #[allow(unused)]
+                use $crate::__private::DefaultReify as _;
+                return phantom_ret_ty.reify();
             }
         }
     };
@@ -218,22 +226,10 @@ macro_rules! make_guard {
 #[doc(hidden)]
 /// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
 pub mod __private {
-    /// Custom `PhantomData` pattern.
-    ///
-    /// See https://docs.rs/ghost or
-    /// https://github.com/dtolnay/case-studies/tree/master/unit-type-parameters
-    /// for more info.
-    pub use custom_phantom::Phony;
-    mod custom_phantom {
-        pub enum Phony<T> {
-            Phony,
-            // uninhabited ZST payload to make this branch itself uninhabited,
-            // and `Self`, a ZST.
-            _PhantomVariant(super::Never, ::core::marker::PhantomData<T>),
-        }
-        // Bring `self::Phony::Phony` from the value namespace into scope, but
-        // don't make `self::Phony::Phony {}` from the type namespace clash.
-        pub use self::Phony::*;
+    pub struct PhantomReturnType<T>(::core::marker::PhantomData<T>);
+
+    impl<T> PhantomReturnType<T> {
+        pub const NEW: Self = Self(::core::marker::PhantomData);
     }
 
     /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
@@ -244,15 +240,17 @@ pub mod __private {
     type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
 
     /// Poorman's specialization for `Phony::<default T / override !>::get()`.
-    pub trait DefaultGet<T> {
-        fn get(&self) -> T { unreachable!() }
+    pub trait DefaultReify<T> {
+        /// Function to be used in dead code to reify/synthesize a `T` instance
+        /// out of our [`PhantomReturnType`].
+        fn reify(&self) -> T { unreachable!() }
     }
 
-    impl<T> DefaultGet<T> for Phony<T> {}
+    impl<T> DefaultReify<T> for PhantomReturnType<T> {}
 
-    impl Phony<Never> {
+    impl PhantomReturnType<Never> {
         /// Uncallable method, via an unmet predicate.
-        pub fn get(&self) -> Never
+        pub fn reify(&self) -> Never
         where
             // Clause needs to involve some lifetime parameter in order not to
             // cause a `trivial_bounds` eager error.
@@ -268,7 +266,7 @@ pub mod __private {
             message = "\
                 `make_guard!()` cannot be used in a diverging/`!`-returning function\
             ",
-            label = "encompassing functions \"diverges\", i.e., returns `-> !`",
+            label = "encompassing functions \"diverges\", e.g., returns `-> !`",
             note = "\
                 `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
                 are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \

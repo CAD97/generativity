@@ -18,21 +18,20 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
  --> tests/ui/diverging_fn.rs:6:5
   |
 6 |     make_guard!(g_a);
-  |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", i.e., returns `-> !`
+  |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", e.g., returns `-> !`
   |
   = help: the trait `__private::sealed::SupportedReturnType` is not implemented for `!`
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
-    = help: the trait `__private::sealed::SupportedReturnType` is implemented for `()`
-note: required by a bound in `__private::<impl generativity::__private::Phony<<fn() -> ! as __private::never_say_never::FnPtr>::Never>>::get`
+note: required by a bound in `PhantomReturnType::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::reify`
    --> src/lib.rs
     |
-    |         pub fn get(&self) -> Never
-    |                --- required by a bound in this associated function
+    |         pub fn reify(&self) -> Never
+    |                ----- required by a bound in this associated function
 ...
     |             for<'trivial> Never : sealed::SupportedReturnType,
-    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `__private::<impl Phony<<fn() -> ! as FnPtr>::Never>>::get`
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `PhantomReturnType::<<fn() -> ! as FnPtr>::Never>::reify`
     = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: unreachable expression
@@ -55,19 +54,18 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
  --> tests/ui/diverging_fn.rs:7:5
   |
 7 |     make_guard!(g_b);
-  |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", i.e., returns `-> !`
+  |     ^^^^^^^^^^^^^^^^ encompassing functions "diverges", e.g., returns `-> !`
   |
   = help: the trait `__private::sealed::SupportedReturnType` is not implemented for `!`
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
-    = help: the trait `__private::sealed::SupportedReturnType` is implemented for `()`
-note: required by a bound in `__private::<impl generativity::__private::Phony<<fn() -> ! as __private::never_say_never::FnPtr>::Never>>::get`
+note: required by a bound in `PhantomReturnType::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::reify`
    --> src/lib.rs
     |
-    |         pub fn get(&self) -> Never
-    |                --- required by a bound in this associated function
+    |         pub fn reify(&self) -> Never
+    |                ----- required by a bound in this associated function
 ...
     |             for<'trivial> Never : sealed::SupportedReturnType,
-    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `__private::<impl Phony<<fn() -> ! as FnPtr>::Never>>::get`
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `PhantomReturnType::<<fn() -> ! as FnPtr>::Never>::reify`
     = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)
