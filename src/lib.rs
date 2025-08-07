@@ -192,13 +192,24 @@ macro_rules! make_guard {
             #[allow(unused)]
             use $crate::__private::DefaultGet as _;
             #[allow(unreachable_code)] {
-                let p = $crate::__private::Phony;
+                let phony = $crate::__private::Phony;
                 if false {
                     // Help inference make out that the type param here is that
                     // of the return type.
-                    return $crate::__private::DefaultGet::get(&p);
+                    return $crate::__private::DefaultGet::get(&phony);
                 }
-                return p.get();
+                // Guarding against `Phony<!>` itself does not suffice, we may
+                // be dealing with `Phony<(!, !)>`, for instance.
+                //
+                // Observation: the very same mechanism which causes us trouble
+                // yields an `unreachable_code` warning in the following situation:
+                if false {
+                    let _reified_ret = $crate::__private::DefaultGet::get(&phony);
+                    #[forbid(unreachable_code)] {
+                        if false {}
+                    }
+                }
+                return phony.get();
             }
         }
     };
