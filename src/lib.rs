@@ -215,6 +215,11 @@ macro_rules! make_guard {
 
                 // Poorman's specialization; only shadowed in the
                 // `PhantomReturnType<!>` case.
+                //
+                // This is not strictly needed for soundness *per se*, since the above
+                // `forbid(unreachable_code)` takes care of that.
+                //
+                // But it greatly improves the diagnostics for the non-niche case.
                 #[allow(unused)]
                 use $crate::__private::DefaultReify as _;
                 return phantom_ret_ty.reify();
