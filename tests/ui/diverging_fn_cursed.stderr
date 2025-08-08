@@ -1,0 +1,41 @@
+error: unreachable expression
+ --> tests/ui/diverging_fn_cursed.rs:8:5
+  |
+8 |     make_guard!(g_b);
+  |     ^^^^^^^^^^^^^^^^
+  |     |
+  |     unreachable expression
+  |     any code following this expression is unreachable
+  |
+note: this expression has type `(!, !)`, which is uninhabited
+ --> tests/ui/diverging_fn_cursed.rs:8:5
+  |
+8 |     make_guard!(g_b);
+  |     ^^^^^^^^^^^^^^^^
+note: the lint level is defined here
+ --> tests/ui/diverging_fn_cursed.rs:8:5
+  |
+8 |     make_guard!(g_b);
+  |     ^^^^^^^^^^^^^^^^
+  = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unreachable expression
+ --> tests/ui/diverging_fn_cursed.rs:7:5
+  |
+7 |     make_guard!(g_a);
+  |     ^^^^^^^^^^^^^^^^
+  |     |
+  |     unreachable expression
+  |     any code following this expression is unreachable
+  |
+note: this expression has type `(!, !)`, which is uninhabited
+ --> tests/ui/diverging_fn_cursed.rs:7:5
+  |
+7 |     make_guard!(g_a);
+  |     ^^^^^^^^^^^^^^^^
+note: the lint level is defined here
+ --> tests/ui/diverging_fn_cursed.rs:7:5
+  |
+7 |     make_guard!(g_a);
+  |     ^^^^^^^^^^^^^^^^
+  = note: this error originates in the macro `make_guard` (in Nightly builds, run with -Z macro-backtrace for more info)

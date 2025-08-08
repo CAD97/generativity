@@ -187,7 +187,106 @@ macro_rules! make_guard {
         #[allow(unused)]
         let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
         let $name = unsafe { $crate::Guard::new(branded_place) };
+
+        // The whole following `if false {}` block has only one role: to handle
+        // the case where follow-up code might diverge.
+        // See https://github.com/CAD97/generativity/issues/15 for more info.
+        if false {
+            #[allow(unreachable_code)] {
+                let phantom_ret_ty = $crate::__private::PhantomReturnType::<_>::NEW;
+                if false {
+                    // Use inference to set the type parameter to that of the return type.
+                    return $crate::__private::DefaultReify::reify(&phantom_ret_ty);
+                }
+
+                // Guarding against `PhantomReturnType<!>` itself does not suffice,
+                // we may be dealing with `PhantomReturnType<(!, !)>`, for instance.
+                //
+                // Observation: the very same mechanism which causes us trouble
+                // yields an `unreachable_code` warning in the following situation:
+                if false {
+                    let _reified_ret =
+                        $crate::__private::DefaultReify::reify(&phantom_ret_ty);
+                    #[forbid(unreachable_code)] {
+                        // any arbitrary statement works to trigger the lint.
+                        if true {}
+                    }
+                }
+
+                // Poorman's specialization; only shadowed in the
+                // `PhantomReturnType<!>` case.
+                //
+                // This is not strictly needed for soundness *per se*, since the above
+                // `forbid(unreachable_code)` takes care of that.
+                //
+                // But it greatly improves the diagnostics for the non-niche case.
+                #[allow(unused)]
+                use $crate::__private::DefaultReify as _;
+                return phantom_ret_ty.reify();
+            }
+        }
     };
+}
+
+#[doc(hidden)]
+/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+pub mod __private {
+    pub struct PhantomReturnType<T>(::core::marker::PhantomData<T>);
+
+    impl<T> PhantomReturnType<T> {
+        pub const NEW: Self = Self(::core::marker::PhantomData);
+    }
+
+    /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
+    mod never_say_never {
+        pub trait FnPtr { type Never; }
+        impl<R> FnPtr for fn() -> R { type Never = R; }
+    }
+    type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
+
+    /// Poorman's specialization for `Phony::<default T / override !>::get()`.
+    pub trait DefaultReify<T> {
+        /// Function to be used in dead code to reify/synthesize a `T` instance
+        /// out of our [`PhantomReturnType`].
+        fn reify(&self) -> T { unreachable!() }
+    }
+
+    impl<T> DefaultReify<T> for PhantomReturnType<T> {}
+
+    impl PhantomReturnType<Never> {
+        /// Uncallable method, via an unmet predicate.
+        pub fn reify(&self) -> Never
+        where
+            // Clause needs to involve some lifetime parameter in order not to
+            // cause a `trivial_bounds` eager error.
+            // `for<'trivial>` is the "typical" workaround so far.
+            for<'trivial> Never : sealed::SupportedReturnType,
+        {
+            unreachable!()
+        }
+    }
+
+    mod sealed {
+        #[diagnostic::on_unimplemented(
+            message = "\
+                `make_guard!()` cannot be used in a diverging/`!`-returning function\
+            ",
+            label = "encompassing functions \"diverges\", e.g., returns `-> !`",
+            note = "\
+                `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
+                are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \
+                and also if the return type of the encompassing function is `!`, for technical reasons. \
+                \n\
+                \n\
+                To this day, no workaround is known, so there is no other choice but to reject the \
+                `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
+                other single instance of `make_guard!()` to remain sound.\
+                \n\
+                See https://github.com/CAD97/generativity/issues/15 for more info.
+            ",
+        )]
+        pub trait SupportedReturnType {}
+    }
 }
 
 #[cfg(test)]

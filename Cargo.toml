@@ -11,6 +11,5 @@ categories = ["no-std", "rust-patterns"]
 license = "MIT OR Apache-2.0"
 
 [dev-dependencies]
-
-[dependencies]
+never-say-never = "6.6.666"
 trybuild = "1.0.110"
