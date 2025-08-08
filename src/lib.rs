@@ -281,6 +281,8 @@ pub mod __private {
                 To this day, no workaround is known, so there is no other choice but to reject the \
                 `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
                 other single instance of `make_guard!()` to remain sound.\
+                \n\
+                See https://github.com/CAD97/generativity/issues/15 for more info.
             ",
         )]
         pub trait SupportedReturnType {}
