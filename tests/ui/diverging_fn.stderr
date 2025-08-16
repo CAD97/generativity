@@ -24,6 +24,8 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
+            See https://github.com/CAD97/generativity/issues/15 for more info.
+
 note: required by a bound in `PhantomReturnType::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::reify`
    --> src/lib.rs
     |
@@ -60,6 +62,8 @@ error[E0277]: `make_guard!()` cannot be used in a diverging/`!`-returning functi
   = note: `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, are broken whenever both a diverging expression follows the `make_guard!()` statement(s), and also if the return type of the encompassing function is `!`, for technical reasons.
 
             To this day, no workaround is known, so there is no other choice but to reject the `-> !`-returning function case: it is quite niche, and sacrificing it allows every other single instance of `make_guard!()` to remain sound.
+            See https://github.com/CAD97/generativity/issues/15 for more info.
+
 note: required by a bound in `PhantomReturnType::<<fn() -> ! as __private::never_say_never::FnPtr>::Never>::reify`
    --> src/lib.rs
     |
