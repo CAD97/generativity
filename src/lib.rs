@@ -165,7 +165,7 @@ impl<'id> LifetimeBrand<'id> {
 ///
 /// Multiple `make_guard` lifetimes will always fail to unify:
 ///
-/// ```rust,compile_fail,E0597
+/// ```rust,compile_fail,E0716
 /// # // trybuild ui test tests/ui/crossed_streams.rs
 /// # use generativity::make_guard;
 /// make_guard!(a);
@@ -188,42 +188,28 @@ macro_rules! make_guard {
         let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
         let $name = unsafe { $crate::Guard::new(branded_place) };
 
-        // The whole following `if false {}` block has only one role: to handle
+        // The whole following `if let Some(_) = None {}` block has only one role: to handle
         // the case where follow-up code might diverge.
-        // See https://github.com/CAD97/generativity/issues/15 for more info.
-        if false {
-            #[allow(unreachable_code)] {
-                let phantom_ret_ty = $crate::__private::PhantomReturnType::<_>::NEW;
-                if false {
-                    // Use inference to set the type parameter to that of the return type.
-                    return $crate::__private::DefaultReify::reify(&phantom_ret_ty);
-                }
-
-                // Guarding against `PhantomReturnType<!>` itself does not suffice,
-                // we may be dealing with `PhantomReturnType<(!, !)>`, for instance.
+        // See https://github.com/CAD97/generativity/issues/15 for the history.
+        //
+        // This works due to the how the phases of rustc are currently organized:
+        //  1. rustc always generates MIR if the block is syntactically reachable
+        //    (meaning, ignoring types) so even if `x` here has type `!`, this
+        //    will still generate MIR (including drop-check).
+        //  2. rustc does type inference, which may resolve `x` to an
+        //    uninhabited type, like `!`. However no MIR opts are done at this stage
+        //  3. rustc does lifetime analysis to verify all references are used properly.
+        //    invalid code which tries to confuse two different `Guard`s will
+        //    FAIL to compile here, not warn, but hard error. Since it is a lifetime error
+        //  4. we never reach MIR opts on this failure, so this code should work
                 //
-                // Observation: the very same mechanism which causes us trouble
-                // yields an `unreachable_code` warning in the following situation:
-                if false {
-                    let _reified_ret =
-                        $crate::__private::DefaultReify::reify(&phantom_ret_ty);
-                    #[forbid(unreachable_code)] {
-                        // any arbitrary statement works to trigger the lint.
-                        if true {}
-                    }
-                }
-
-                // Poorman's specialization; only shadowed in the
-                // `PhantomReturnType<!>` case.
+        // if rustc ever decides to do MIR opts between type check and lifetime check
+        // then this pattern could break. But that's unlikely.
                 //
-                // This is not strictly needed for soundness *per se*, since the above
-                // `forbid(unreachable_code)` takes care of that.
-                //
-                // But it greatly improves the diagnostics for the non-niche case.
-                #[allow(unused)]
-                use $crate::__private::DefaultReify as _;
-                return phantom_ret_ty.reify();
-            }
+        // This branch ensures that there is at least one place where the `LifetimeBrand`
+        // is dropped. Which ensures that all `LifetimeBrand`s created will have unique lifetimes
+        if let Some(x) = None {
+            return x;
         }
     };
 }

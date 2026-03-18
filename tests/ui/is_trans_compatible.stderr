@@ -1,4 +1,12 @@
-error: zero-sized fields in `repr(transparent)` cannot contain external non-exhaustive types
+warning: lint `repr_transparent_external_private_fields` has been renamed to `repr_transparent_non_zst_fields`
+ --> tests/ui/is_trans_compatible.rs:3:9
+  |
+3 | #![deny(repr_transparent_external_private_fields)] // this should not trigger
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use the new name: `repr_transparent_non_zst_fields`
+  |
+  = note: `#[warn(renamed_and_removed_lints)]` on by default
+
+error: zero-sized fields in `repr(transparent)` cannot contain external types with private fields
  --> tests/ui/is_trans_compatible.rs:8:39
   |
 8 | pub struct BOption<'id, T>(Option<T>, Id<'id>); // this should work
@@ -6,7 +14,7 @@ error: zero-sized fields in `repr(transparent)` cannot contain external non-exha
   |
   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
   = note: for more information, see issue #78586 <https://github.com/rust-lang/rust/issues/78586>
-  = note: this struct contains `Id<'id>`, which contains private fields, and makes it not a breaking change to become non-zero-sized in the future.
+  = note: this field contains `Id<'_>`, which contains private fields, so it could become non-zero-sized in the future.
 note: the lint level is defined here
  --> tests/ui/is_trans_compatible.rs:3:9
   |
