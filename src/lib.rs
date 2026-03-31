@@ -44,7 +44,7 @@ use core_::fmt;
 use core_::marker::PhantomData;
 
 #[doc(hidden)]
-/// NOT STABLE PUBLIC API. Previously Used by the expansion of [`make_guard!`].
+/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
 pub extern crate core as core_;
 
 /// A phantomdata-like type taking a single invariant lifetime.
@@ -202,13 +202,13 @@ macro_rules! make_guard {
         //    invalid code which tries to confuse two different `Guard`s will
         //    FAIL to compile here, not warn, but hard error. Since it is a lifetime error
         //  4. we never reach MIR opts on this failure, so this code should work
-                //
+        //
         // if rustc ever decides to do MIR opts between type check and lifetime check
         // then this pattern could break. But that's unlikely.
-                //
+        //
         // This branch ensures that there is at least one place where the `LifetimeBrand`
         // is dropped. Which ensures that all `LifetimeBrand`s created will have unique lifetimes
-        if let Some(x) = None {
+        if let $crate::core_::option::Option::Some(x) = $crate::core_::option::Option::None {
             return x;
         }
     };
@@ -225,8 +225,12 @@ pub mod __private {
 
     /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
     mod never_say_never {
-        pub trait FnPtr { type Never; }
-        impl<R> FnPtr for fn() -> R { type Never = R; }
+        pub trait FnPtr {
+            type Never;
+        }
+        impl<R> FnPtr for fn() -> R {
+            type Never = R;
+        }
     }
     type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
 
@@ -234,7 +238,9 @@ pub mod __private {
     pub trait DefaultReify<T> {
         /// Function to be used in dead code to reify/synthesize a `T` instance
         /// out of our [`PhantomReturnType`].
-        fn reify(&self) -> T { unreachable!() }
+        fn reify(&self) -> T {
+            unreachable!()
+        }
     }
 
     impl<T> DefaultReify<T> for PhantomReturnType<T> {}
@@ -246,7 +252,7 @@ pub mod __private {
             // Clause needs to involve some lifetime parameter in order not to
             // cause a `trivial_bounds` eager error.
             // `for<'trivial>` is the "typical" workaround so far.
-            for<'trivial> Never : sealed::SupportedReturnType,
+            for<'trivial> Never: sealed::SupportedReturnType,
         {
             unreachable!()
         }
@@ -269,7 +275,7 @@ pub mod __private {
                 other single instance of `make_guard!()` to remain sound.\
                 \n\
                 See https://github.com/CAD97/generativity/issues/15 for more info.
-            ",
+            "
         )]
         pub trait SupportedReturnType {}
     }
