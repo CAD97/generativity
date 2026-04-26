@@ -1,17 +1,17 @@
 #![cfg_attr(not(test), no_std)]
 
 //! Create a trusted carrier with a new lifetime that is guaranteed to be
-//! unique among other trusted carriers. When you call [`make_guard!`] to make a
+//! unique among other trusted carriers. When you call [`guard!`] to make a
 //! unique lifetime, the macro creates a [`Guard`] to hold it. This guard can be
 //! converted `into` an [`Id`], which can be stored in structures to uniquely
 //! "brand" them. A different invocation of the macro will produce a new
 //! lifetime that cannot be unified. The only way to construct these types is
-//! with [`make_guard!`] or `unsafe` code.
+//! with [`guard!`] or `unsafe` code.
 //!
 //! ```rust
-//! use generativity::{Id, make_guard};
+//! use generativity::{Id, guard};
 //! struct Struct<'id>(Id<'id>);
-//! make_guard!(a);
+//! let a = guard!();
 //! Struct(a.into());
 //! ```
 //!
@@ -50,7 +50,7 @@ use core::marker::PhantomData;
 ///
 /// Holding `Id<'id>` indicates that the lifetime `'id` is a trusted brand.
 /// `'id` will not unify with another trusted brand lifetime unless it comes
-/// from the same original brand (i.e. the same invocation of [`make_guard!`]).
+/// from the same original brand (i.e. the same invocation of [`guard!`]).
 #[repr(transparent)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Id<'id> {
@@ -60,7 +60,7 @@ pub struct Id<'id> {
 impl<'id> Id<'id> {
     /// Construct an `Id` with an unbounded lifetime.
     ///
-    /// You should not need to use this function; use [`make_guard!`] instead.
+    /// You should not need to use this function; use [`guard!`] instead.
     ///
     /// # Safety
     ///
@@ -90,7 +90,7 @@ impl<'id> From<Guard<'id>> for Id<'id> {
 /// An invariant lifetime phantomdata-alike that is guaranteed to be unique
 /// with respect to other trusted invariant lifetimes.
 ///
-/// In effect, this means that `'id` is a "generative brand". Use [`make_guard`]
+/// In effect, this means that `'id` is a "generative brand". Use [`guard`]
 /// to obtain a new `Guard`.
 #[repr(transparent)]
 #[derive(Eq, PartialEq)]
@@ -102,7 +102,7 @@ pub struct Guard<'id> {
 impl<'id> Guard<'id> {
     /// Construct a `Guard` with an unbound lifetime.
     ///
-    /// You should not need to use this function; use [`make_guard!`] instead.
+    /// You should not need to use this function; use [`guard!`] instead.
     ///
     /// # Safety
     ///
@@ -122,7 +122,7 @@ impl<'id> fmt::Debug for Guard<'id> {
 }
 
 #[doc(hidden)]
-/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+/// NOT STABLE PUBLIC API. Used by the expansion of [`guard!`].
 pub struct LifetimeBrand<'id> {
     phantom: PhantomData<&'id Id<'id>>,
 }
@@ -140,11 +140,11 @@ impl<'id> Drop for LifetimeBrand<'id> {
 }
 
 #[doc(hidden)]
-/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+/// NOT STABLE PUBLIC API. Used by the expansion of [`guard!`].
 impl<'id> LifetimeBrand<'id> {
     #[doc(hidden)]
     #[inline(always)]
-    /// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+    /// NOT STABLE PUBLIC API. Used by the expansion of [`guard!`].
     pub unsafe fn new(_: &'id Id<'id>) -> LifetimeBrand<'id> {
         // This function serves to entangle the `'id` lifetime, making it into
         // a proper lifetime brand. The `'id` region may open at any point, but
@@ -159,30 +159,35 @@ impl<'id> LifetimeBrand<'id> {
 /// Create a `Guard` with a unique invariant lifetime (with respect to other
 /// trusted/invariant lifetime brands).
 ///
-/// Multiple `make_guard` lifetimes will always fail to unify:
+/// An optional identifier can be provided so that local errors can point out
+/// both conflicting brands if they are confused.
+///
+/// Multiple `guard!`ed lifetimes will always fail to unify:
 ///
 /// ```rust,compile_fail,E0716
-/// # // trybuild ui test tests/ui/crossed_streams.rs
-/// # use generativity::make_guard;
-/// make_guard!(a);
-/// make_guard!(b);
+/// # // trybuild ui test tests/ui/crossed_streams-expr.rs
+/// # #![feature(super_let)]
+/// # use generativity::guard;
+/// let a = guard!(a);
+/// let b = guard!(b);
 /// dbg!(a == b); // ERROR (here == is a static check)
 /// ```
 #[macro_export]
-macro_rules! make_guard {
-    ($name:ident) => {
+macro_rules! guard {
+    () => {
+        $crate::guard! { anonymous_generativity_brand }
+    };
+    ($name:ident) => {{
         // SAFETY: The lifetime given to `$name` is unique among trusted brands.
         // We know this because of how we carefully control drop timing here.
         // The branded lifetime's end is bound to be no later than when the
         // `branded_place` is invalidated at the end of scope, but also must be
-        // no sooner than `lifetime_brand` is dropped, also at the end of scope.
+        // no sooner than when `$name` is dropped, also at the end of scope.
         // Some other variant lifetime could be constrained to be equal to the
-        // brand lifetime, but no other lifetime branded by `make_guard!` can,
+        // brand lifetime, but no other lifetime branded by `guard!` can,
         // as its brand lifetime has a distinct drop time from this one. QED
-        let branded_place = unsafe { $crate::Id::new() };
-        #[allow(unused)]
-        let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
-        let $name = unsafe { $crate::Guard::new(branded_place) };
+        super let branded_place = unsafe { $crate::Id::new() };
+        #[allow(unused)] super let $name = unsafe { $crate::LifetimeBrand::new(&branded_place) };
 
         // The whole following `if let Some(_) = None {}` block has only one role: to handle
         // the case where follow-up code might diverge.
@@ -206,12 +211,37 @@ macro_rules! make_guard {
         // is dropped. Which ensures that all `LifetimeBrand`s created will have unique lifetimes
         if let $crate::__private::Some(x) = $crate::__private::None {
             return x;
+        } else {
+            unsafe { $crate::Guard::new(branded_place) }
+        }
+    }};
+}
+
+/// Create a `Guard` with a unique invariant lifetime (with respect to other
+/// trusted/invariant lifetime brands).
+///
+/// This is a statement macro version of [`guard!`] that works on Rust versions
+/// before `#![feature(super_let)]`
+#[macro_export]
+macro_rules! make_guard {
+    ($name:ident) => {
+        // SAFETY: See guard! above.
+        let branded_place = unsafe { $crate::Id::new() };
+        // We could use $name instead of anonymous_generativity_brand, but this
+        // leads to confusion of whether the drop timing note is about this or
+        // the created Guard value.
+        #[allow(unused)]
+        let lifetime_brand = unsafe { $crate::LifetimeBrand::new(&branded_place) };
+        let $name = unsafe { $crate::Guard::new(branded_place) };
+
+        if let $crate::__private::Some(x) = $crate::__private::None {
+            return x;
         }
     };
 }
 
 #[doc(hidden)]
-/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
+/// NOT STABLE PUBLIC API. Used by the expansion of [`guard!`].
 pub mod __private {
     pub use {None, Some};
 }
