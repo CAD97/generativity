@@ -16,5 +16,5 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
     - run: |
-        CARGO_PKG_VERSION=`sed -n 's/^version = "([^"])"/\1/p`
+        CARGO_PKG_VERSION=`sed -n 's/^version = "([^"])"/\1/p'`
         gh release create "v$CARGO_PKG_VERSION"
