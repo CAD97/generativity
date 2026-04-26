@@ -40,12 +40,8 @@
 //! only indicates invariance, whereas `&mut T` can carry further implication
 //! of "by example" use of `PhantomData`.
 
-use core_::fmt;
-use core_::marker::PhantomData;
-
-#[doc(hidden)]
-/// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
-pub extern crate core as core_;
+use core::fmt;
+use core::marker::PhantomData;
 
 /// A phantomdata-like type taking a single invariant lifetime.
 ///
@@ -208,7 +204,7 @@ macro_rules! make_guard {
         //
         // This branch ensures that there is at least one place where the `LifetimeBrand`
         // is dropped. Which ensures that all `LifetimeBrand`s created will have unique lifetimes
-        if let $crate::core_::option::Option::Some(x) = $crate::core_::option::Option::None {
+        if let $crate::__private::Some(x) = $crate::__private::None {
             return x;
         }
     };
@@ -217,68 +213,7 @@ macro_rules! make_guard {
 #[doc(hidden)]
 /// NOT STABLE PUBLIC API. Used by the expansion of [`make_guard!`].
 pub mod __private {
-    pub struct PhantomReturnType<T>(::core::marker::PhantomData<T>);
-
-    impl<T> PhantomReturnType<T> {
-        pub const NEW: Self = Self(::core::marker::PhantomData);
-    }
-
-    /// Inlined [`::never-say-never`](https://docs.rs/never-say-never).
-    mod never_say_never {
-        pub trait FnPtr {
-            type Never;
-        }
-        impl<R> FnPtr for fn() -> R {
-            type Never = R;
-        }
-    }
-    type Never = <fn() -> ! as never_say_never::FnPtr>::Never;
-
-    /// Poorman's specialization for `Phony::<default T / override !>::get()`.
-    pub trait DefaultReify<T> {
-        /// Function to be used in dead code to reify/synthesize a `T` instance
-        /// out of our [`PhantomReturnType`].
-        fn reify(&self) -> T {
-            unreachable!()
-        }
-    }
-
-    impl<T> DefaultReify<T> for PhantomReturnType<T> {}
-
-    impl PhantomReturnType<Never> {
-        /// Uncallable method, via an unmet predicate.
-        pub fn reify(&self) -> Never
-        where
-            // Clause needs to involve some lifetime parameter in order not to
-            // cause a `trivial_bounds` eager error.
-            // `for<'trivial>` is the "typical" workaround so far.
-            for<'trivial> Never: sealed::SupportedReturnType,
-        {
-            unreachable!()
-        }
-    }
-
-    mod sealed {
-        #[diagnostic::on_unimplemented(
-            message = "\
-                `make_guard!()` cannot be used in a diverging/`!`-returning function\
-            ",
-            label = "encompassing functions \"diverges\", e.g., returns `-> !`",
-            note = "\
-                `make_guard!()` temporary and lifetime shenanigans, on which its soundness model hinges, \
-                are broken whenever both a diverging expression follows the `make_guard!()` statement(s), \
-                and also if the return type of the encompassing function is `!`, for technical reasons. \
-                \n\
-                \n\
-                To this day, no workaround is known, so there is no other choice but to reject the \
-                `-> !`-returning function case: it is quite niche, and sacrificing it allows every \
-                other single instance of `make_guard!()` to remain sound.\
-                \n\
-                See https://github.com/CAD97/generativity/issues/15 for more info.
-            "
-        )]
-        pub trait SupportedReturnType {}
-    }
+    pub use {None, Some};
 }
 
 #[cfg(test)]
@@ -298,13 +233,14 @@ mod test {
     fn test_oibits() {
         fn assert_oibits<T>(_: &T)
         where
+            // unstable oibits: UnsafeUnpin + Freeze
             T: Send + Sync + Unpin + UnwindSafe + RefUnwindSafe,
         {
         }
 
-        make_guard!(a);
-        assert_oibits(&a);
-        let id: Id<'_> = a.into();
+        make_guard!(guard);
+        assert_oibits(&guard);
+        let id: Id<'_> = guard.into();
         assert_oibits(&id);
 
         // const compatible (e.g. const_refs_to_cell, const destructor)
