@@ -12,9 +12,9 @@ error: zero-sized fields in `repr(transparent)` cannot contain external types wi
 8 | pub struct BOption<'id, T>(Option<T>, Id<'id>); // this should work
   |                                       ^^^^^^^
   |
+  = note: this field contains `Id<'_>`, which contains private fields, so it could become non-zero-sized in the future.
   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
   = note: for more information, see issue #78586 <https://github.com/rust-lang/rust/issues/78586>
-  = note: this field contains `Id<'_>`, which contains private fields, so it could become non-zero-sized in the future.
 note: the lint level is defined here
  --> tests/ui/is_trans_compatible.rs:3:9
   |
